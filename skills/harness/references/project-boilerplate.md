@@ -33,7 +33,7 @@ exec sbt test "$@"
 
 ## `build.sbt` (snippet)
 
-Publish or path-include **cursor4s**, then depend on it:
+**cursor4s** is a **local SNAPSHOT** (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in the cursor4s repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes so harnesses pick up fresh artifacts.
 
 ```scala
 val scala3Version = "3.8.3"
@@ -44,20 +44,11 @@ lazy val harness = project
     name := "my-harness",
     scalaVersion := scala3Version,
     libraryDependencies ++= Seq(
+      "me.anatoliikmt" %% "cursor4s" % "0.1.0-SNAPSHOT",
       "com.lihaoyi" %% "os-lib" % "0.11.8",
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
-      // "io.github.USER" %% "cursor4s" % "0.1.0", // or unmanaged / publishLocal
     ),
   )
-```
-
-For a **path dependency** while developing locally (adjust the path):
-
-```scala
-// Compile dependency on sibling checkout:
-// unmanagedBase := file("../cursor4s/target/scala-3.8.3") // not typical; prefer publishLocal:
-// In the cursor4s checkout: `sbt publishLocal`
-// Then: "io.github.USER" %% "cursor4s" % "0.1.0"
 ```
 
 ## `project/build.properties`

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+
+echo "Publishing cursor4s to local Ivy cache (sbt publishLocal)..."
+sbt publishLocal
 
 echo "Removing previously installed skill..."
 rm -rf ~/.agents/skills/harness 2>/dev/null || true
