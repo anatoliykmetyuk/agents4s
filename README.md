@@ -1,5 +1,7 @@
 # cursor4s (Scala)
 
+[![CI](https://github.com/anatoliykmetyuk/cursor4s/actions/workflows/ci.yml/badge.svg)](https://github.com/anatoliykmetyuk/cursor4s/actions/workflows/ci.yml)
+
 Scala 3 library that runs the Cursor `agent` CLI in tmux and exposes a small API to start the session, send prompts, and observe or wait on agent lifecycle. The main type is **`cursordriver.CursorAgent`**.
 
 **Requirements:** JDK 17+, [sbt](https://www.scala-sbt.org/) 1.12.x, tmux, and `agent` on your `PATH`.
