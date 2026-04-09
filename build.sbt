@@ -6,7 +6,7 @@ ThisBuild / scalaVersion := scala3Version
 lazy val root = project
   .in(file("."))
   .settings(
-    name := "cursor-driver",
+    name := "cursor4s",
     Test / fork := true,
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "os-lib" % "0.11.8",

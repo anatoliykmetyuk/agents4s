@@ -3,7 +3,7 @@ name: harness
 description: >
   Turn a markdown SOP (Standard Operating Procedure) into a Scala 3 harness
   that automates mechanical steps via script and delegates agentic steps to
-  Cursor agents via cursor-driver (Scala).  Use this skill whenever the user wants to
+  Cursor agents via cursor4s (Scala).  Use this skill whenever the user wants to
   automate an SOP, convert a procedure into a script, harness a workflow, or
   mentions turning a markdown procedure into code that orchestrates agents.
   Also use when the user says "harness", "automate this SOP", or asks to
@@ -15,7 +15,7 @@ description: >
 You are converting a human-readable SOP (Standard Operating Procedure) written
 in markdown into a self-contained **Scala 3** project that **scripts** the
 mechanical parts and **delegates** the judgment-heavy parts to Cursor agents
-via **`cursordriver.CursorAgent`** from the [cursor-driver-scala](.) library.
+via **`cursordriver.CursorAgent`** from the [cursor4s](.) library.
 
 ## When to use this skill
 
@@ -47,7 +47,7 @@ some-dir/
     ├── setup.sh              # sbt compile / deps
     ├── run.sh                  # sbt runMain …
     ├── test.sh                 # sbt test (unit vs integration flags)
-    ├── build.sbt               # depends on cursor-driver-scala (see boilerplate)
+    ├── build.sbt               # depends on cursor4s (see boilerplate)
     ├── project/build.properties
     ├── .gitignore
     ├── src/main/scala/.../Main.scala
@@ -78,7 +78,7 @@ Do **not** rewrite the body of `SOP.md` except an optional top note that automat
 
 - [ ] Working directory resolved from SOP data; `--workdir` override on the CLI.
 - [ ] `SOP.md` present.
-- [ ] `setup.sh` / `run.sh` executable; `build.sbt` references cursor-driver-scala.
+- [ ] `setup.sh` / `run.sh` executable; `build.sbt` references cursor4s.
 - [ ] Every agentic step has a `prompts/` template with `{{PLACEHOLDER}}` tokens.
 - [ ] Configuration (model, parallelism, tmux socket) at the top of the main entry point.
 - [ ] `agent.awaitDone()` after every `start` / `sendPrompt` call that should block until the agent finishes.

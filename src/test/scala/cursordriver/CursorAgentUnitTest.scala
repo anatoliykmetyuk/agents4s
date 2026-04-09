@@ -39,7 +39,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       os.list(d)
         .filter { p =>
           val n = p.last
-          n.startsWith("cursor-driver-prompt-") && n.endsWith(".md")
+          n.startsWith("cursor4s-prompt-") && n.endsWith(".md")
         }
         .toSeq
         .sortBy(_.toString)

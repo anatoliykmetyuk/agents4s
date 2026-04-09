@@ -33,7 +33,7 @@ exec sbt test "$@"
 
 ## `build.sbt` (snippet)
 
-Publish or path-include **cursor-driver-scala**, then depend on it:
+Publish or path-include **cursor4s**, then depend on it:
 
 ```scala
 val scala3Version = "3.8.3"
@@ -46,7 +46,7 @@ lazy val harness = project
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "os-lib" % "0.11.8",
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
-      // "io.github.USER" %% "cursor-driver" % "0.1.0", // or unmanaged / publishLocal
+      // "io.github.USER" %% "cursor4s" % "0.1.0", // or unmanaged / publishLocal
     ),
   )
 ```
@@ -55,9 +55,9 @@ For a **path dependency** while developing locally (adjust the path):
 
 ```scala
 // Compile dependency on sibling checkout:
-// unmanagedBase := file("../cursor-driver-scala/target/scala-3.8.3") // not typical; prefer publishLocal:
-// In cursor-driver-scala: `sbt publishLocal`
-// Then: "cursor-driver" %% "cursor-driver" % "0.1.0"
+// unmanagedBase := file("../cursor4s/target/scala-3.8.3") // not typical; prefer publishLocal:
+// In the cursor4s checkout: `sbt publishLocal`
+// Then: "io.github.USER" %% "cursor4s" % "0.1.0"
 ```
 
 ## `project/build.properties`

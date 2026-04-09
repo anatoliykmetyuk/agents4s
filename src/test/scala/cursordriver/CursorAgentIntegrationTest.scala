@@ -27,7 +27,7 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     assume(Paths.which("tmux").nonEmpty, "tmux not on PATH")
 
   private def tmpWorkspace: os.Path =
-    os.Path(Files.createTempDirectory("cursor-driver-int").toFile)
+    os.Path(Files.createTempDirectory("cursor4s-int").toFile)
 
   private def uniqueSessionIds: (String, String) =
     val u = UUID.randomUUID().toString.replace("-", "").take(12)
@@ -464,7 +464,7 @@ $c
       os.list(d)
         .filter { p =>
           val n = p.last
-          n.startsWith("cursor-driver-prompt-") && n.endsWith(".md")
+          n.startsWith("cursor4s-prompt-") && n.endsWith(".md")
         }
         .toSeq
     else Seq.empty

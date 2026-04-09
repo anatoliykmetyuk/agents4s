@@ -1,4 +1,4 @@
-# cursor-driver (Scala)
+# cursor4s (Scala)
 
 Scala 3 library that runs the Cursor `agent` CLI in tmux and exposes a small API to start the session, send prompts, and observe or wait on agent lifecycle. The main type is **`cursordriver.CursorAgent`**.
 

@@ -90,7 +90,7 @@ class CursorAgent(
         os.makeDir.all(promptStagingDir)
         val nio = Files.createTempFile(
           promptStagingDir.toNIO,
-          "cursor-driver-prompt-",
+          "cursor4s-prompt-",
           ".md"
         )
         val path = os.Path(nio)
@@ -121,7 +121,7 @@ class CursorAgent(
             os.makeDir.all(promptStagingDir)
             val nio = Files.createTempFile(
               promptStagingDir.toNIO,
-              "cursor-driver-prompt-",
+              "cursor4s-prompt-",
               ".md"
             )
             val path = os.Path(nio)

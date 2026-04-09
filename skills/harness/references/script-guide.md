@@ -69,7 +69,7 @@ for file <- chunks.tail do
 agent.stop()
 ```
 
-## cursor-driver (Scala) API
+## cursor4s API
 
 - `new CursorAgent(workspace: os.Path, model: String, tmuxSocket = …, label = …, quiet = …, killSession = …, …)`
 - `def start(prompt: Option[String] = None): Int` — `0` ok, `127` no `agent` on `PATH`, `1` error/timeout.
