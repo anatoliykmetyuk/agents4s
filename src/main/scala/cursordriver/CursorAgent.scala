@@ -111,8 +111,6 @@ class CursorAgent(
         127
       case Some(agentBin) =>
         val tmux = newTmuxServer(tmuxSocket)
-        try tmux.killSession(label)
-        catch case _: Exception => ()
 
         cleanupAllPromptFiles()
         pane = None

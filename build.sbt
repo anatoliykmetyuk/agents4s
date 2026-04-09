@@ -7,6 +7,7 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := "cursor-driver",
+    Test / fork := true,
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "os-lib" % "0.11.8",
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,

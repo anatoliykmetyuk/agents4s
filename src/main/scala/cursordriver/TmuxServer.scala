@@ -4,6 +4,14 @@ import os.*
 
 import scala.language.implicitConversions
 
+object TmuxServer:
+
+  /** Matches tmux: TMUX_TMPDIR or /tmp, then tmux-$(id -u), then -L socket file name. */
+  private lazy val unixUserId: String =
+    proc(Seq("id", "-u").map(s => s: Shellable)*).call().out.text().trim
+
+end TmuxServer
+
 final class TmuxServer(socketName: String):
 
   private def tmux(extra: String*): Seq[String] =
@@ -12,8 +20,15 @@ final class TmuxServer(socketName: String):
   private def run(cmd: Seq[String], check: Boolean = true): os.CommandResult =
     proc(cmd.map(s => s: Shellable)*).call(check = check)
 
+  /** Path to the tmux server socket file for this `-L` name (if the server were running). */
+  private def socketFile: Path =
+    val base = sys.env.get("TMUX_TMPDIR").map(Path(_)).getOrElse(Path("/tmp"))
+    base / s"tmux-${TmuxServer.unixUserId}" / socketName
+
+  def socketExists: Boolean = os.exists(socketFile)
+
   def hasSession(sessionName: String): Boolean =
-    run(tmux("has-session", "-t", sessionName), check = false).exitCode == 0
+    socketExists && run(tmux("has-session", "-t", sessionName), check = false).exitCode == 0
 
   def killSession(sessionName: String): Unit =
     if hasSession(sessionName) then
