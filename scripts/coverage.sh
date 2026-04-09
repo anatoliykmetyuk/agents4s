@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+if [[ "${1:-}" == -i || "${1:-}" == --integration ]]; then
+  export CURSOR_DRIVER_INTEGRATION=1
+  shift
+  exec sbt clean coverage test coverageReport "$@"
+else
+  exec sbt clean coverage "testOnly cursordriver.TuiOpsTest cursordriver.CursorAgentUnitTest" coverageReport "$@"
+fi
