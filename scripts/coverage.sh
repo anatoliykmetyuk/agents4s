@@ -6,5 +6,5 @@ if [[ "${1:-}" == -i || "${1:-}" == --integration ]]; then
   shift
   exec sbt clean coverage test coverageReport "$@"
 else
-  exec sbt clean coverage "testOnly cursordriver.TuiOpsTest cursordriver.CursorAgentUnitTest" coverageReport "$@"
+  exec sbt clean coverage "testOnly cursordriver.TuiOpsTest cursordriver.CursorAgentUnitTest cursordriver.PathsTest cursordriver.PaneTraitTest" coverageReport "$@"
 fi

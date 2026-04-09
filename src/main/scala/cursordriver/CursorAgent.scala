@@ -18,6 +18,7 @@ class CursorAgent(
     /** Sleep after sendKeys text before Enter (Python: 0.2s). */
     postSendKeysPause: Double => Unit = d => Thread.sleep(math.max(0L, (d * 1000.0).toLong)),
     newTmuxServer: String => TmuxServer = s => new TmuxServer(s),
+    newPane: (String, String) => Pane = (s, t) => new TmuxPane(s, t),
     /** When false, [[stop]] skips tmux kill (for tests with mock panes). */
     killRemoteOnStop: Boolean = true,
     out: PrintStream = System.out,
@@ -135,7 +136,7 @@ class CursorAgent(
 
           val cmd = Seq(agentBin, "--yolo", "--model", model, "--workspace", workspace.toString)
           val target = tmux.newSession(label, workspace, cmd)
-          pane = Some(new TmuxPane(tmuxSocket, target))
+          pane = Some(newPane(tmuxSocket, target))
 
           prompt match
             case None => 0

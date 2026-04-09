@@ -78,7 +78,7 @@ out/
 
 ## Prompt template example
 
-(language-agnostic — same as Python boilerplate)
+Prompt templates are language-agnostic — they work identically regardless of the harness language.
 
 ```markdown
 You are running the discovery workflow for **one** plugin.

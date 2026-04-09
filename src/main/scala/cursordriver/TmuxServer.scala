@@ -12,7 +12,7 @@ object TmuxServer:
 
 end TmuxServer
 
-final class TmuxServer(socketName: String):
+class TmuxServer(socketName: String):
 
   private def tmux(extra: String*): Seq[String] =
     Seq("tmux", "-L", socketName) ++ extra

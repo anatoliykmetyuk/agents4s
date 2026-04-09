@@ -60,7 +60,7 @@ Read [references/project-boilerplate.md](references/project-boilerplate.md) for 
 
 ## Step 3 — Write prompt templates
 
-Same as Python version: `{{PLACEHOLDER}}` syntax, context table, tasks, rules.
+Use `{{PLACEHOLDER}}` syntax in each template. Include a context table with key/value pairs the script substitutes, a tasks section listing what the agent must do, and a rules section with constraints.
 
 ## Step 4 — Write the automation script
 
@@ -81,7 +81,7 @@ Do **not** rewrite the body of `SOP.md` except an optional top note that automat
 - [ ] `setup.sh` / `run.sh` executable; `build.sbt` references cursor-driver-scala.
 - [ ] Every agentic step has a `prompts/` template with `{{PLACEHOLDER}}` tokens.
 - [ ] Configuration (model, parallelism, tmux socket) at the top of the main entry point.
-- [ ] `agent.awaitDone()` after successful agent turns that use `start` / `sendPrompt` as in the Python guide.
+- [ ] `agent.awaitDone()` after every `start` / `sendPrompt` call that should block until the agent finishes.
 - [ ] Chunk long tasks across `_prompt_N.md` files; use `killSession = false` for multi-turn sessions.
 - [ ] `out/` gitignored.
 - [ ] `sbt test` passes (see [TESTING.md](TESTING.md)).

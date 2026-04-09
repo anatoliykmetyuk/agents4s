@@ -2,6 +2,8 @@ package cursordriver
 
 import java.util.concurrent.TimeoutException
 
+import scala.collection.mutable
+
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -162,6 +164,37 @@ class TuiOpsTest extends AnyFunSuite with Matchers with TableDrivenPropertyCheck
     val text = TuiOps.tailText(pane, nLines = 10)(using fastCfg)
     text should not include ("\u001b")
     text should include(F)
+  }
+
+  test(
+    "default timeout and nLines accessors: awaitReady awaitBusy awaitDone handleTrust tailText"
+  ) {
+    val r = new MockPane(Seq(Seq(F)))
+    TuiOps.awaitReady(r)(using fastCfg)
+    val b = new MockPane(Seq(Seq(B)))
+    TuiOps.awaitBusy(b)(using fastCfg)
+    val d = new MockPane(Seq(Seq(F)))
+    TuiOps.awaitDone(d)(using fastCfg)
+    val h = new MockPane(Seq(Seq(F)))
+    TuiOps.handleTrust(h)(using fastCfg)
+    val t = new MockPane(Seq(Seq("x", F)))
+    TuiOps.tailText(t)(using fastCfg) should include(F)
+  }
+
+  test("TuiConfig sleeper used when polling awaitReady") {
+    var now = 0L
+    val sleeps = mutable.ArrayBuffer[Double]()
+    val cfg = TuiConfig(
+      pollIntervalS = 1.0,
+      sleeper = { d =>
+        sleeps += d
+        now += (d * 1e9).toLong
+      },
+      clockNanos = () => now
+    )
+    val pane = new MockPane(Seq(Seq("boot"), Seq(F)))
+    TuiOps.awaitReady(pane, timeoutS = 10.0)(using cfg)
+    sleeps should not be empty
   }
 
 end TuiOpsTest

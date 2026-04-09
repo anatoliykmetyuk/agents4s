@@ -53,15 +53,15 @@ Use **traits** or **abstract classes** with `beforeEach` / helper methods instea
 
 **Classpath** — keep main sources under `src/main/scala` and test under `src/test/scala`; sbt wires the classpath.
 
-## Replacing pytest patterns
+## Common testing patterns
 
-| Python | Scala |
-|--------|--------|
-| `monkeypatch` | Constructor / `given` dependency injection |
-| `unittest.mock.patch` | Test doubles, stub classes |
-| `tmp_path` | `Files.createTempDirectory` + `os.Path` |
-| `pytest.mark.parametrize` | ScalaTest `TableDrivenPropertyChecks` or loops over examples |
-| `pytest.raises` | `assertThrows` / `intercept` |
+| Need | ScalaTest approach |
+|------|-------------------|
+| Replace a dependency at test time | Constructor / `given` dependency injection |
+| Stub out a collaborator | Test doubles, stub classes |
+| Temporary filesystem root | `Files.createTempDirectory` + `os.Path` |
+| Parameterized test cases | `TableDrivenPropertyChecks` or loops over examples |
+| Assert an exception is thrown | `assertThrows` / `intercept` |
 
 ## Checklist
 

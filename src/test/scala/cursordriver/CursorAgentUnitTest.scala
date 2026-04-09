@@ -11,6 +11,10 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
 
   private val F = TuiOps.FooterMarker
   private val B = TuiOps.BusyMarker
+  private val T = TuiOps.TrustMarker
+
+  private def trueOnPath: Option[String] =
+    Paths.which("true").orElse(Some("/bin/true"))
 
   private def unitAgent(
       workspace: os.Path,
@@ -149,6 +153,142 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
 
     agent.stop()
 
+    globPrompts(tmp) shouldBe empty
+    agent.promptPaths shouldBe empty
+  }
+
+  test("minimal constructor exposes default public settings") {
+    val tmp = tmpWorkspace
+    val agent = new CursorAgent(tmp, "composer-2")
+    agent.workspace shouldBe tmp
+    agent.model shouldBe "composer-2"
+    agent.tmuxSocket shouldBe "cursor-agent"
+    agent.label shouldBe "agent"
+    agent.quiet shouldBe false
+    agent.killSession shouldBe true
+  }
+
+  test("awaitReady and awaitDone use default timeout when pane settles immediately") {
+    val tmp = tmpWorkspace
+    val agent = unitAgent(tmp)
+    val donePane = new MockPane(Seq(Seq(F)))
+    agent.pane = Some(donePane)
+    agent.awaitDone()
+    val readyPane = new MockPane(Seq(Seq(F)))
+    agent.pane = Some(readyPane)
+    agent.awaitReady()
+  }
+
+  test("isTrustPrompt isReady isBusy use tail with multiline pane") {
+    val tmp = tmpWorkspace
+    val agent = unitAgent(tmp)
+    val trustTail = (Seq.fill(19)("pad") :+ T).toSeq
+    agent.pane = Some(new MockPane(Seq(trustTail)))
+    agent.isTrustPrompt shouldBe true
+    agent.isReady shouldBe false
+
+    val readyTail = (Seq.fill(19)("pad") :+ F).toSeq
+    agent.pane = Some(new MockPane(Seq(readyTail)))
+    agent.isReady shouldBe true
+    agent.isTrustPrompt shouldBe false
+    agent.isBusy shouldBe false
+
+    val busyTail = (Seq.fill(19)("pad") :+ B).toSeq
+    agent.pane = Some(new MockPane(Seq(busyTail)))
+    agent.isBusy shouldBe true
+  }
+
+  test("stop with killRemoteOnStop invokes tmux killSession") {
+    val tmp = tmpWorkspace
+    val rec = new RecordingTmuxServer("sock")
+    val agent = new CursorAgent(
+      tmp,
+      "composer-2",
+      tmuxSocket = "sock",
+      label = "my-lab",
+      killSession = false,
+      killRemoteOnStop = true,
+      newTmuxServer = _ => rec,
+      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
+      postSendKeysPause = _ => ()
+    )
+    agent.stop()
+    rec.killSessionNames.toList shouldBe List("my-lab")
+  }
+
+  test("start without prompt uses newPane and returns 0") {
+    val tmp = tmpWorkspace
+    val rec = new RecordingTmuxServer("soc")
+    val agent = new CursorAgent(
+      tmp,
+      "composer-2",
+      tmuxSocket = "soc",
+      label = "lab",
+      quiet = true,
+      killSession = false,
+      killRemoteOnStop = false,
+      whichExecutable = _ => trueOnPath,
+      postSendKeysPause = _ => (),
+      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
+      newTmuxServer = _ => rec,
+      newPane = (_, _) => new MockPane(Seq(Seq(F))),
+      err = new PrintStream(OutputStream.nullOutputStream())
+    )
+    agent.start(None) shouldBe 0
+    agent.pane.nonEmpty shouldBe true
+    rec.killSessionNames shouldBe empty
+  }
+
+  test("start with killSession stops tmux session via newTmuxServer") {
+    val tmp = tmpWorkspace
+    val rec = new RecordingTmuxServer("soc")
+    val agent = new CursorAgent(
+      tmp,
+      "composer-2",
+      tmuxSocket = "soc",
+      label = "lab",
+      quiet = true,
+      killSession = true,
+      killRemoteOnStop = true,
+      whichExecutable = _ => trueOnPath,
+      postSendKeysPause = _ => (),
+      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
+      newTmuxServer = _ => rec,
+      newPane = (_, _) => new MockPane(Seq(Seq(F))),
+      err = new PrintStream(OutputStream.nullOutputStream())
+    )
+    agent.start(None) shouldBe 0
+    rec.killSessionNames should contain("lab")
+    agent.pane shouldBe empty
+  }
+
+  test("start with prompt discards staging file in finally") {
+    val tmp = tmpWorkspace
+    val rec = new RecordingTmuxServer("soc")
+    val frames = Seq(
+      Seq(F),
+      Seq(F),
+      Seq(F),
+      Seq(s"$F\n$B"),
+      Seq(F)
+    )
+    val agent = new CursorAgent(
+      tmp,
+      "composer-2",
+      tmuxSocket = "soc",
+      label = "lab",
+      quiet = true,
+      killSession = false,
+      killRemoteOnStop = false,
+      whichExecutable = _ => trueOnPath,
+      postSendKeysPause = _ => (),
+      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
+      newTmuxServer = _ => rec,
+      newPane = (_, _) => new MockPane(frames),
+      err = new PrintStream(OutputStream.nullOutputStream())
+    )
+    globPrompts(tmp) shouldBe empty
+    agent.start(Some("prompt-body")) shouldBe 0
     globPrompts(tmp) shouldBe empty
     agent.promptPaths shouldBe empty
   }
