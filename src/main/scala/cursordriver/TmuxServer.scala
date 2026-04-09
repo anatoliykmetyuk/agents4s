@@ -1,0 +1,74 @@
+package cursordriver
+
+import os.*
+
+import scala.language.implicitConversions
+
+final class TmuxServer(socketName: String):
+
+  private def tmux(extra: String*): Seq[String] =
+    Seq("tmux", "-L", socketName) ++ extra
+
+  private def run(cmd: Seq[String], check: Boolean = true): os.CommandResult =
+    proc(cmd.map(s => s: Shellable)*).call(check = check)
+
+  def hasSession(sessionName: String): Boolean =
+    run(tmux("has-session", "-t", sessionName), check = false).exitCode == 0
+
+  def killSession(sessionName: String): Unit =
+    if hasSession(sessionName) then
+      run(tmux("kill-session", "-t", sessionName), check = false): @annotation.nowarn
+
+  /** Detached session with initial command; returns first window pane target `name:0.0`. */
+  def newSession(sessionName: String, startDirectory: Path, command: Seq[String]): String =
+    val prefix = tmux(
+      "new-session",
+      "-d",
+      "-s",
+      sessionName,
+      "-c",
+      startDirectory.toString
+    )
+    run(prefix ++ command)
+    s"$sessionName:0.0"
+
+end TmuxServer
+
+final class TmuxPane(socketName: String, target: String) extends Pane:
+
+  private def tmux(extra: String*): Seq[String] =
+    Seq("tmux", "-L", socketName) ++ extra
+
+  private def run(cmd: Seq[String]): os.CommandResult =
+    proc(cmd.map(s => s: Shellable)*).call()
+
+  override def capturePane(start: Int = -10): Seq[String] =
+    val out = run(tmux("capture-pane", "-p", "-t", target, "-S", start.toString))
+    val text = out.out.text()
+    if text.isEmpty then Seq.empty
+    else
+      val raw = text.stripTrailing()
+      if raw.isEmpty then Seq("")
+      else raw.split("\n", -1).toSeq
+
+  override def captureEntireScrollback(): Seq[String] =
+    val out = run(tmux("capture-pane", "-p", "-t", target, "-S", "-", "-E", "-"))
+    val text = out.out.text()
+    if text.isEmpty then Seq.empty
+    else text.stripTrailing().split("\n", -1).toSeq
+
+  override def sendKeys(keys: String, enter: Boolean = false): Unit =
+    if keys.nonEmpty then run(tmux("send-keys", "-t", target, "-l", keys))
+    if enter then run(tmux("send-keys", "-t", target, "C-m"))
+
+end TmuxPane
+
+object Paths:
+
+  /** Resolve first executable named `name` on PATH (like shutil.which). */
+  def which(name: String): Option[String] =
+    val res = proc(Seq("sh", "-c", s"command -v $name").map(s => s: Shellable)*).call(check = false)
+    if res.exitCode == 0 then Some(res.out.text().trim)
+    else None
+
+end Paths

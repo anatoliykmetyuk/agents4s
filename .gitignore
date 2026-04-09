@@ -1,0 +1,9 @@
+target/
+.bsp/
+.metals/
+.bloop/
+project/metals.sbt
+project/project/
+.idea/
+*.iml
+.DS_Store
