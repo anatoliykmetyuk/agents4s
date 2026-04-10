@@ -40,6 +40,68 @@ Use **`scripts/test.sh`** (runs from project root; see [project-boilerplate.md](
 | Child spawned | Parent factory takes `spawn` hook or use `ActorTestKit` `spawn` |
 | Blocking LLM | Never call real `CursorAgent`—inject `LlmPort` returning `Future.successful(...)` |
 
+## Mock `LlmPort` + `LlmBridge` (concrete)
+
+Match the **`LlmPort`** shape from [llm-bridge-guide.md](llm-bridge-guide.md). Production uses **`CursorAgentLlmPort`**; tests use a stub that never touches tmux:
+
+```scala
+import scala.concurrent.{ExecutionContext, Future}
+import agents4s.Agent
+
+final class MockLlmPort(
+    result: Either[String, Option[String]] = Right(Some("{\"status\":\"OK\"}"))
+) extends LlmPort:
+  def runOneShot(prompt: String, workspace: os.Path, model: String, timeoutS: Double)(using
+      ec: ExecutionContext
+  ): Future[Either[String, Option[String]]] =
+    Future.successful(result)
+```
+
+**Actor test** (ScalaTest + `ActorTestKit`): spawn **`LlmBridge`** with the mock and assert on **`replyTo`**. Use the same **`blocking-llm-dispatcher`** from `application.conf` as production so behavior matches.
+
+```scala
+import java.nio.file.Files
+
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.DispatcherSelector
+import agents4s.Agent
+import org.scalatest.wordspec.AnyWordSpec
+
+class LlmBridgeTest extends ScalaTestWithActorTestKit with AnyWordSpec:
+
+  private def blockingEc =
+    system.dispatchers.lookup(DispatcherSelector.fromConfig("blocking-llm-dispatcher"))
+
+  private def tmpWorkspace: os.Path = os.Path(Files.createTempDirectory("llm-bridge-test"))
+
+  "LlmBridge" should {
+    "reply Ok when the port succeeds" in {
+      val probe = createTestProbe[LlmBridge.Result]()
+      val ws = tmpWorkspace
+      val bridge = spawn(LlmBridge(new MockLlmPort(Right(Some("artifact"))), blockingEc))
+      bridge ! LlmBridge.Run(
+        promptMarkdown = "ignored-by-mock",
+        workspace = ws,
+        readOutputPath = None,
+        model = "noop",
+        timeoutS = Agent.DefaultTimeoutS,
+        replyTo = probe.ref
+      )
+      probe.expectMessage(LlmBridge.Ok(0, Some("artifact")))
+    }
+
+    "reply Failed when the port returns Left" in {
+      val probe = createTestProbe[LlmBridge.Result]()
+      val ws = tmpWorkspace
+      val bridge = spawn(LlmBridge(new MockLlmPort(Left("boom")), blockingEc))
+      bridge ! LlmBridge.Run("p", ws, None, "m", Agent.DefaultTimeoutS, probe.ref)
+      probe.expectMessage(LlmBridge.Failed("boom"))
+    }
+  }
+```
+
+If you don’t load **`application.conf`** in tests, either merge a `application-test.conf` that defines **`blocking-llm-dispatcher`**, or inject a harmless **`ExecutionContext`** (e.g. `system.dispatchers.lookup(DispatcherSelector.default())`) **only** when the mock always returns `Future.successful` and never blocks—prefer aligning test config with prod.
+
 ## Shared fixtures
 
 - One `ActorTestKit` per test class (`afterAll`: `testKit.shutdownTestKit()`).

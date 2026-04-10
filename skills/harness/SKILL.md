@@ -74,7 +74,7 @@ For **each** actor:
 
 - Each actor: `Behavior[ActorName.Command]` (or equivalent) from `ActorName.apply(...)` factory; file header `// Spec: specs/....md`; spec gets matching `<!-- impl: ... -->` when done.
 - **Mechanical** procedure steps → ordinary Scala in the behavior.
-- **Agentic** steps → `LlmBridge` (or injected port) using patterns from [references/llm-bridge-guide.md](references/llm-bridge-guide.md): `Future` + blocking dispatcher + `pipeToSelf`, strict file/JSON contract.
+- **Agentic** steps → `LlmBridge` (or injected port): read [references/llm-bridge-guide.md](references/llm-bridge-guide.md) for **`Agent` / `CursorAgent` / `AgentConfig`**, one-shot vs multi-turn, **`LlmPort`**, and a full **`pipeToSelf`** example. **Do not** search the filesystem for agents4s sources—use that guide only. Use **`Future`** on the blocking dispatcher + **`pipeToSelf`**, with a strict file/JSON contract for model output.
 - **`LlmBridge` messages** also live on `LlmBridge`’s companion object and are referenced as `LlmBridge.Run`, etc.
 
 ## Step 5 — `prompts/`
@@ -105,4 +105,5 @@ Follow [references/testing.md](references/testing.md): `ActorTestKit`, `TestProb
 ## Maintainer notes
 
 - **Cursor / repo copy:** this folder ships with [agents4s](.); `build.sbt` uses `publishLocal` artifacts.
+- **CursorAgent API:** treat [references/llm-bridge-guide.md](references/llm-bridge-guide.md) as the **canonical public API** summary for harness work (`Agent`, `CursorAgent`, `AgentConfig`, bridge examples). When agents4s changes, update that guide so users never need to hunt the library sources.
 - **Eval prompts:** see [evals/evals.json](evals/evals.json). For description tuning, see [references/trigger-eval-set.json](references/trigger-eval-set.json) and the skill-creator `run_loop` (optional).
