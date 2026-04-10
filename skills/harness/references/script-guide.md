@@ -1,6 +1,6 @@
 # Automation Script Guide (Scala 3)
 
-Patterns for the main harness (`src/main/scala/.../Main.scala`). Library API: **`cursordriver.CursorAgent`**.
+Patterns for the main harness (`src/main/scala/.../Main.scala`). Library API: **`agents4s.cursor.CursorAgent`** and **`agents4s.tmux.AgentConfig`**.
 
 ## Working directory
 
@@ -40,7 +40,8 @@ def applyPlaceholders(template: String, m: Map[String, String]): String =
 **Agentic** steps: load template → `applyPlaceholders` → drive `CursorAgent`.
 
 ```scala
-import cursordriver.CursorAgent
+import agents4s.cursor.CursorAgent
+import agents4s.tmux.AgentConfig
 
 def runStep(entry: Item, workspace: Path, model: String, template: String, quiet: Boolean): Int =
   val prompt = applyPlaceholders(template, Map("KEY" -> entry.id.toString))
@@ -49,18 +50,24 @@ def runStep(entry: Item, workspace: Path, model: String, template: String, quiet
     model,
     tmuxSocket = tmuxSocket,
     label = s"step-${entry.id}",
-    quiet = quiet,
-    killSession = true,
+    oneShot = true,
+    config = AgentConfig(quiet = quiet)
   )
   agent.start(Some(prompt))
 ```
 
 ## Chunking long-running tasks
 
-Use `killSession = false`, then `sendPrompt` for follow-up chunks; `stop()` when finished.
+Use `oneShot = false`, then `sendPrompt` for follow-up chunks; `stop()` when finished.
 
 ```scala
-val agent = new CursorAgent(workspace, model, tmuxSocket = tmuxSocket, killSession = false)
+val agent = new CursorAgent(
+  workspace,
+  model,
+  tmuxSocket = tmuxSocket,
+  oneShot = false,
+  config = AgentConfig()
+)
 if agent.start(Some(applyPlaceholders(chunk0, mapping))) != 0 then return 1
 agent.awaitDone()
 for file <- chunks.tail do
@@ -69,15 +76,15 @@ for file <- chunks.tail do
 agent.stop()
 ```
 
-## cursor4s API
+## agents4s API
 
-- `new CursorAgent(workspace: os.Path, model: String, tmuxSocket = …, label = …, quiet = …, killSession = …, …)`
+- `new CursorAgent(workspace: os.Path, model: String, tmuxSocket = …, label = …, oneShot = …, config: AgentConfig = …)`
 - `def start(prompt: Option[String] = None): Int` — `0` ok, `127` no `agent` on `PATH`, `1` error/timeout.
-- `def awaitDone(timeoutS: Double = TuiOps.AgentTimeoutS): Unit`
+- `def awaitDone(timeoutS: Double = agents4s.Agent.DefaultTimeoutS): Unit`
 - `def sendPrompt(text: String, timeoutS: Double = …, promptAsFile: Boolean = true): Unit`
 - `def isReady` / `def isBusy` / `def isTrustPrompt`
 - `def awaitReady` / `def awaitBusy`
-- `var pane: Option[cursordriver.Pane]` — prefer high-level methods for production code.
+- `var pane: Option[agents4s.tmux.Pane]` — prefer high-level methods for production code.
 
 ## Parallel execution
 

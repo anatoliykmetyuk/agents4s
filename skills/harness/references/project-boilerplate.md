@@ -33,7 +33,7 @@ exec sbt test "$@"
 
 ## `build.sbt` (snippet)
 
-**cursor4s** is a **local SNAPSHOT** (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in the cursor4s repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes so harnesses pick up fresh artifacts.
+**agents4s** is a **local SNAPSHOT** (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in the agents4s repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes so harnesses pick up fresh artifacts.
 
 ```scala
 val scala3Version = "3.8.3"
@@ -44,7 +44,7 @@ lazy val harness = project
     name := "my-harness",
     scalaVersion := scala3Version,
     libraryDependencies ++= Seq(
-      "me.anatoliikmt" %% "cursor4s" % "0.1.0-SNAPSHOT",
+      "me.anatoliikmt" %% "agents4s" % "0.1.0-SNAPSHOT",
       "com.lihaoyi" %% "os-lib" % "0.11.8",
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
     ),

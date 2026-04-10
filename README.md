@@ -1,8 +1,8 @@
-# cursor4s (Scala)
+# agents4s (Scala)
 
 [![CI](https://github.com/anatoliykmetyuk/cursor4s/actions/workflows/ci.yml/badge.svg)](https://github.com/anatoliykmetyuk/cursor4s/actions/workflows/ci.yml)
 
-Scala 3 library that runs the Cursor `agent` CLI in tmux and exposes a small API to start the session, send prompts, and observe or wait on agent lifecycle. The main type is **`cursordriver.CursorAgent`**.
+Scala 3 library that runs agent CLIs in tmux behind a unified API (`agents4s.Agent`). The Cursor implementation is **`agents4s.cursor.CursorAgent`**, which drives the Cursor `agent` CLI.
 
 **Requirements:** JDK 17+, [sbt](https://www.scala-sbt.org/) 1.12.x, tmux, and `agent` on your `PATH`.
 
@@ -16,7 +16,8 @@ Example:
 
 ```scala
 import os.*
-import cursordriver.CursorAgent
+import agents4s.cursor.CursorAgent
+import agents4s.tmux.AgentConfig
 
 val repo = Path("/path/to/your/repo")
 val driver = new CursorAgent(repo, model = "your-model-id")
@@ -25,8 +26,13 @@ if driver.start(Some("Do one task and summarize.")) != 0 then
   sys.exit(1)
 
 // Or keep the session for multiple prompts:
-val longLived = new CursorAgent(repo, model = "your-model-id", killSession = false)
-if longLived.start() != 0 then sys.exit(1)
+val longLived = new CursorAgent(
+  repo,
+  model = "your-model-id",
+  oneShot = false,
+  config = AgentConfig()
+)
+if longLived.start(None) != 0 then sys.exit(1)
 longLived.sendPrompt("First instruction.")
 longLived.awaitDone()
 longLived.sendPrompt("Second instruction.")
@@ -48,17 +54,15 @@ Install (requires Node.js for `npx`):
 
 | Member | Role |
 |--------|------|
-| Constructor | `new CursorAgent(workspace, model, tmuxSocket = …, label = …, quiet = …, killSession = …, …)` — `workspace` is an `os.Path`; optional tmux socket, session label, stdout noise, and whether `start` tears the session down on exit. |
+| Constructor | `new CursorAgent(workspace, model, tmuxSocket = …, label = …, oneShot = …, config = AgentConfig(…))` — optional tmux socket, session label; `oneShot` controls whether `start` tears down the session in `finally`; `AgentConfig` holds `quiet`, factories, polling, and I/O streams. |
 | `start` | `start(prompt: Option[String] = None): Int` — launch `agent` in tmux and set `pane`. `None`: return when the session exists. `Some`: run to completion. Returns `0`, `127` (no `agent`), or `1`. |
 | `sendPrompt` | `sendPrompt(text, timeoutS = …, promptAsFile = true)` — after `start`, wait for readiness, send prompt (default: temp `.md` under `.cursor/prompts/` plus “read file” line), then wait until busy. |
-| `isTrustPrompt` / `isReady` / `isBusy` | Snapshot predicates on the current pane tail. |
+| `isTrustPrompt` / `isReady` / `isBusy` | Snapshot predicates on the current pane tail (Cursor TUI). |
 | `awaitReady` / `awaitBusy` / `awaitDone` | Blocking wait helpers. |
-| `pane` | `Option[cursordriver.Pane]` after a successful `start`. |
-| `stop` | Kill tmux session (if `killRemoteOnStop`), delete tracked prompt files, clear `pane`. |
+| `pane` | `Option[agents4s.tmux.Pane]` after a successful `start`. |
+| `stop` | Kill tmux session (if `killRemoteOnStop` in config), delete tracked prompt files, clear `pane`. |
 
-Public attributes: `workspace`, `model`, `tmuxSocket`, `label`, `quiet`, `killSession`.
-
-Low-level TUI helpers live in **`cursordriver.TuiOps`** (same markers and waiters as the Python package).
+Shared tmux helpers: `agents4s.tmux.TmuxServer`, `TmuxPane`, `Paths`, `TmuxServer.stripAnsi`. Cursor-specific TUI detection lives in **`agents4s.cursor.CursorTuiOps`**.
 
 ## Lint & format
 

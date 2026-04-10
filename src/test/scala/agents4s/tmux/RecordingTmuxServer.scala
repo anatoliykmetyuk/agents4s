@@ -1,4 +1,4 @@
-package cursordriver
+package agents4s.tmux
 
 import scala.collection.mutable
 

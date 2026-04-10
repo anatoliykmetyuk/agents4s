@@ -1,10 +1,12 @@
-package cursordriver
+package agents4s.cursor
 
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.file.Files
 import java.util.UUID
 import java.util.regex.Pattern
+
+import agents4s.tmux.{AgentConfig, Paths, TmuxServer}
 
 import org.scalatest.Assertions.{assume, withClue}
 import org.scalatest.concurrent.TimeLimits
@@ -27,7 +29,7 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     assume(Paths.which("tmux").nonEmpty, "tmux not on PATH")
 
   private def tmpWorkspace: os.Path =
-    os.Path(Files.createTempDirectory("cursor4s-int").toFile)
+    os.Path(Files.createTempDirectory("agents4s-int").toFile)
 
   private def uniqueSessionIds: (String, String) =
     val u = UUID.randomUUID().toString.replace("-", "").take(12)
@@ -45,9 +47,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false,
-      tuiConfig = TuiConfig()
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     try
       withTimeout:
@@ -68,8 +69,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     try
       withTimeout:
@@ -93,8 +94,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = true
+      oneShot = true,
+      config = AgentConfig(quiet = true)
     )
     withTimeout:
       val rc = agent.start(Some(instruction))
@@ -115,8 +116,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
         model,
         tmuxSocket = soc,
         label = label,
-        quiet = true,
-        killSession = false
+        oneShot = false,
+        config = AgentConfig(quiet = true)
       )
       try
         withTimeout:
@@ -147,8 +148,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = true
+      oneShot = true,
+      config = AgentConfig(quiet = true)
     )
     withTimeout:
       agent.start(None) shouldBe 0
@@ -165,8 +166,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     try
       withTimeout:
@@ -185,8 +186,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     withTimeout:
       agent.start(None) shouldBe 0
@@ -206,8 +207,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     try
       withTimeout:
@@ -241,8 +242,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     try
       withTimeout:
@@ -269,8 +270,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     try
       withTimeout:
@@ -326,8 +327,8 @@ $c
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     try
       withTimeout:
@@ -358,8 +359,8 @@ $c
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     try
       withTimeout:
@@ -383,8 +384,8 @@ $c
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     try
       withTimeout:
@@ -420,8 +421,8 @@ $c
         model,
         tmuxSocket = soc,
         label = label,
-        quiet = true,
-        killSession = false
+        oneShot = false,
+        config = AgentConfig(quiet = true)
       )
       try
         withTimeout:
@@ -446,9 +447,8 @@ $c
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = true,
-      out = out
+      oneShot = true,
+      config = AgentConfig(quiet = true, out = out)
     )
     withTimeout:
       val rc = agent.start(None)
@@ -470,8 +470,8 @@ $c
       model,
       tmuxSocket = soc,
       label = label,
-      quiet = true,
-      killSession = false
+      oneShot = false,
+      config = AgentConfig(quiet = true)
     )
     try
       withTimeout:
@@ -481,7 +481,7 @@ $c
         agent.sendPrompt(instruction, timeoutS = 900, promptAsFile = true)
         agent.awaitDone(timeoutS = 900)
         val lines = agent.pane.get.captureEntireScrollback()
-        val dump = TuiOps.stripAnsi(lines.mkString("\n"))
+        val dump = TmuxServer.stripAnsi(lines.mkString("\n"))
         val p = Pattern.compile("(?i)source\\s+\\S*activate")
         val m = p.matcher(dump)
         val hits = Iterator.continually(m.find()).takeWhile(identity).length
@@ -495,7 +495,7 @@ $c
       os.list(d)
         .filter { p =>
           val n = p.last
-          n.startsWith("cursor4s-prompt-") && n.endsWith(".md")
+          n.startsWith("agents4s-prompt-") && n.endsWith(".md")
         }
         .toSeq
     else Seq.empty

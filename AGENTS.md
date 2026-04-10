@@ -26,7 +26,7 @@ Runs `scalafmtCheckAll`.
 scripts/test.sh
 ```
 
-Runs **unit tests only** (`TuiOpsTest`, `CursorAgentUnitTest`, `PathsTest`, `PaneTraitTest`).
+Runs **unit tests only** (`CursorTuiOpsTest`, `CursorAgentUnitTest`, `PathsTest`, `PaneTraitTest`).
 
 Integration tests (live `agent` + tmux) require:
 
@@ -44,7 +44,7 @@ Extra arguments are forwarded to `sbt` (after the optional `-i` flag).
 scripts/coverage.sh
 ```
 
-Runs **`clean` → `coverage` → unit tests only** (`TuiOpsTest`, `CursorAgentUnitTest`, `PathsTest`, `PaneTraitTest`) → `coverageReport`. HTML output is under `target/scala-<version>/scoverage-report/`.
+Runs **`clean` → `coverage` → unit tests only** (`CursorTuiOpsTest`, `CursorAgentUnitTest`, `PathsTest`, `PaneTraitTest`) → `coverageReport`. HTML output is under `target/scala-<version>/scoverage-report/`.
 
 To aggregate coverage **including** integration tests (when `CURSOR_DRIVER_INTEGRATION` is set and `agent` / `tmux` are available; otherwise those tests are canceled):
 

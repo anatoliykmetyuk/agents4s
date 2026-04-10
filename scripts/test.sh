@@ -6,5 +6,5 @@ if [[ "${1:-}" == -i || "${1:-}" == --integration ]]; then
   shift
   exec sbt test "$@"
 else
-  exec sbt "testOnly cursordriver.TuiOpsTest cursordriver.CursorAgentUnitTest cursordriver.PathsTest cursordriver.PaneTraitTest" "$@"
+  exec sbt "testOnly agents4s.cursor.CursorTuiOpsTest agents4s.cursor.CursorAgentUnitTest agents4s.tmux.PathsTest agents4s.tmux.PaneTraitTest" "$@"
 fi

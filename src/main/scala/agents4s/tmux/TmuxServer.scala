@@ -1,10 +1,16 @@
-package cursordriver
+package agents4s.tmux
+
+import java.util.regex.Pattern
 
 import os.*
-
 import scala.language.implicitConversions
 
 object TmuxServer:
+
+  private val ansiRe: Pattern = Pattern.compile("\u001b\\[[\\d;]*[A-Za-z]")
+
+  def stripAnsi(text: String): String =
+    ansiRe.matcher(text).replaceAll("")
 
   /** Matches tmux: TMUX_TMPDIR or /tmp, then tmux-$(id -u), then -L socket file name. */
   private lazy val unixUserId: String =

@@ -1,4 +1,4 @@
-package cursordriver
+package agents4s.tmux
 
 /** Minimal pane surface for TUI capture and key injection (tmux or test double). */
 trait Pane:
@@ -13,3 +13,5 @@ trait Pane:
 
   /** Send SIGINT-style interrupt (tmux: send-keys C-c). */
   def sendInterrupt(): Unit
+
+end Pane

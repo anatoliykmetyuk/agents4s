@@ -1,17 +1,19 @@
-package cursordriver
+package agents4s.cursor
 
 import java.io.OutputStream
 import java.io.PrintStream
 import java.nio.file.Files
+
+import agents4s.tmux.{AgentConfig, MockPane, Paths, RecordingTmuxServer, Pane}
 
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 class CursorAgentUnitTest extends AnyFunSuite with Matchers:
 
-  private val F = TuiOps.FooterMarker
-  private val B = TuiOps.BusyMarker
-  private val T = TuiOps.TrustMarker
+  private val F = CursorTuiOps.FooterMarker
+  private val B = CursorTuiOps.BusyMarker
+  private val T = CursorTuiOps.TrustMarker
 
   private def trueOnPath: Option[String] =
     Paths.which("true").orElse(Some("/bin/true"))
@@ -19,15 +21,18 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
   private def unitAgent(
       workspace: os.Path,
       model: String = "composer-2",
-      killSession: Boolean = false
+      oneShot: Boolean = false
   ): CursorAgent =
     new CursorAgent(
       workspace,
       model,
-      killSession = killSession,
-      killRemoteOnStop = false,
-      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
-      postSendKeysPause = _ => ()
+      oneShot = oneShot,
+      config = AgentConfig(
+        pollIntervalS = 0.0,
+        sleeper = _ => (),
+        killRemoteOnStop = false,
+        postSendKeysPause = _ => ()
+      )
     )
 
   private def tmpWorkspace: os.Path =
@@ -39,7 +44,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       os.list(d)
         .filter { p =>
           val n = p.last
-          n.startsWith("cursor4s-prompt-") && n.endsWith(".md")
+          n.startsWith("agents4s-prompt-") && n.endsWith(".md")
         }
         .toSeq
         .sortBy(_.toString)
@@ -47,7 +52,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
 
   test("requirePane methods before start raise") {
     val tmp = tmpWorkspace
-    val agent = unitAgent(tmp, killSession = true)
+    val agent = unitAgent(tmp, oneShot = true)
     intercept[RuntimeException](agent.isReady).getMessage should include("not started")
     intercept[RuntimeException](agent.isBusy).getMessage should include("not started")
     intercept[RuntimeException](agent.isTrustPrompt).getMessage should include("not started")
@@ -60,7 +65,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
 
   test("stop is safe before start and clears pane") {
     val tmp = tmpWorkspace
-    val agent = unitAgent(tmp, killSession = false)
+    val agent = unitAgent(tmp, oneShot = false)
     agent.stop()
     agent.pane shouldBe empty
     val pane = new MockPane(Seq(Seq(F)))
@@ -74,10 +79,12 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
     val agent = new CursorAgent(
       tmp,
       "composer-2",
-      killSession = true,
-      killRemoteOnStop = false,
-      whichExecutable = _ => None,
-      err = new PrintStream(OutputStream.nullOutputStream())
+      oneShot = true,
+      config = AgentConfig(
+        whichExecutable = _ => None,
+        err = new PrintStream(OutputStream.nullOutputStream()),
+        killRemoteOnStop = false
+      )
     )
     agent.start() shouldBe 127
     agent.pane shouldBe empty
@@ -90,21 +97,20 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       "composer-2",
       tmuxSocket = "s",
       label = "l",
-      quiet = true,
-      killSession = false,
-      killRemoteOnStop = false
+      oneShot = false,
+      config = AgentConfig(quiet = true, killRemoteOnStop = false)
     )
     agent.workspace shouldBe tmp
     agent.model shouldBe "composer-2"
     agent.tmuxSocket shouldBe "s"
     agent.label shouldBe "l"
-    agent.quiet shouldBe true
-    agent.killSession shouldBe false
+    agent.config.quiet shouldBe true
+    agent.oneShot shouldBe false
   }
 
   test("sendPrompt ordering after start") {
     val tmp = tmpWorkspace
-    val agent = unitAgent(tmp, killSession = false)
+    val agent = unitAgent(tmp, oneShot = false)
     val pane = new MockPane(Seq(Seq(F), Seq(s"$F\n$B")))
     agent.pane = Some(pane)
     agent.sendPrompt("hello world", promptAsFile = false)
@@ -114,7 +120,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
 
   test("sendPrompt as file creates temp and sends read instruction") {
     val tmp = tmpWorkspace
-    val agent = unitAgent(tmp, killSession = false)
+    val agent = unitAgent(tmp, oneShot = false)
     val pane = new MockPane(Seq(Seq(F), Seq(F), Seq(s"$F\n$B")))
     agent.pane = Some(pane)
     val body = "some long text with\nnewlines and unicode: é"
@@ -133,7 +139,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
 
   test("sendPrompt as file cleanup removes tracked files") {
     val tmp = tmpWorkspace
-    val agent = unitAgent(tmp, killSession = false)
+    val agent = unitAgent(tmp, oneShot = false)
     val pane = new MockPane(
       Seq(
         Seq(F),
@@ -164,8 +170,8 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
     agent.model shouldBe "composer-2"
     agent.tmuxSocket shouldBe "cursor-agent"
     agent.label shouldBe "agent"
-    agent.quiet shouldBe false
-    agent.killSession shouldBe true
+    agent.config.quiet shouldBe false
+    agent.oneShot shouldBe true
   }
 
   test("awaitReady and awaitDone use default timeout when pane settles immediately") {
@@ -206,11 +212,14 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       "composer-2",
       tmuxSocket = "sock",
       label = "my-lab",
-      killSession = false,
-      killRemoteOnStop = true,
-      newTmuxServer = _ => rec,
-      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
-      postSendKeysPause = _ => ()
+      oneShot = false,
+      config = AgentConfig(
+        killRemoteOnStop = true,
+        newTmuxServer = _ => rec,
+        pollIntervalS = 0.0,
+        sleeper = _ => (),
+        postSendKeysPause = _ => ()
+      )
     )
     agent.pane = Some(new MockPane(Seq(Seq(F))))
     agent.stop()
@@ -225,11 +234,14 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       "composer-2",
       tmuxSocket = "sock",
       label = "my-lab",
-      killSession = false,
-      killRemoteOnStop = true,
-      newTmuxServer = _ => rec,
-      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
-      postSendKeysPause = _ => ()
+      oneShot = false,
+      config = AgentConfig(
+        killRemoteOnStop = true,
+        newTmuxServer = _ => rec,
+        pollIntervalS = 0.0,
+        sleeper = _ => (),
+        postSendKeysPause = _ => ()
+      )
     )
     agent.pane shouldBe empty
     agent.stop()
@@ -245,11 +257,14 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       "composer-2",
       tmuxSocket = "sock",
       label = "lab",
-      killSession = false,
-      killRemoteOnStop = false,
-      newTmuxServer = _ => rec,
-      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
-      postSendKeysPause = _ => ()
+      oneShot = false,
+      config = AgentConfig(
+        killRemoteOnStop = false,
+        newTmuxServer = _ => rec,
+        pollIntervalS = 0.0,
+        sleeper = _ => (),
+        postSendKeysPause = _ => ()
+      )
     )
     val pane = new MockPane(Seq((Seq.fill(19)("pad") :+ F).toSeq))
     agent.pane = Some(pane)
@@ -266,11 +281,14 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       "composer-2",
       tmuxSocket = "sock",
       label = "lab",
-      killSession = false,
-      killRemoteOnStop = true,
-      newTmuxServer = _ => rec,
-      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
-      postSendKeysPause = _ => ()
+      oneShot = false,
+      config = AgentConfig(
+        killRemoteOnStop = true,
+        newTmuxServer = _ => rec,
+        pollIntervalS = 0.0,
+        sleeper = _ => (),
+        postSendKeysPause = _ => ()
+      )
     )
     val busyTail = (Seq.fill(19)("pad") :+ B).toSeq
     val readyTail = (Seq.fill(19)("pad") :+ F).toSeq
@@ -291,11 +309,14 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       "composer-2",
       tmuxSocket = "sock",
       label = "lab",
-      killSession = false,
-      killRemoteOnStop = true,
-      newTmuxServer = _ => rec,
-      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
-      postSendKeysPause = _ => ()
+      oneShot = false,
+      config = AgentConfig(
+        killRemoteOnStop = true,
+        newTmuxServer = _ => rec,
+        pollIntervalS = 0.0,
+        sleeper = _ => (),
+        postSendKeysPause = _ => ()
+      )
     )
     val busyTail = (Seq.fill(19)("pad") :+ B).toSeq
     val pane = new MockPane(Seq(busyTail))
@@ -314,11 +335,14 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       "composer-2",
       tmuxSocket = "sock",
       label = "lab",
-      killSession = false,
-      killRemoteOnStop = true,
-      newTmuxServer = _ => rec,
-      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
-      postSendKeysPause = _ => ()
+      oneShot = false,
+      config = AgentConfig(
+        killRemoteOnStop = true,
+        newTmuxServer = _ => rec,
+        pollIntervalS = 0.0,
+        sleeper = _ => (),
+        postSendKeysPause = _ => ()
+      )
     )
     val pane = new Pane:
       def capturePane(start: Int = -10): Seq[String] =
@@ -340,22 +364,25 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       "composer-2",
       tmuxSocket = "soc",
       label = "lab",
-      quiet = true,
-      killSession = false,
-      killRemoteOnStop = false,
-      whichExecutable = _ => trueOnPath,
-      postSendKeysPause = _ => (),
-      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
-      newTmuxServer = _ => rec,
-      newPane = (_, _) => new MockPane(Seq(Seq(F))),
-      err = new PrintStream(OutputStream.nullOutputStream())
+      oneShot = false,
+      config = AgentConfig(
+        quiet = true,
+        killRemoteOnStop = false,
+        whichExecutable = _ => trueOnPath,
+        postSendKeysPause = _ => (),
+        pollIntervalS = 0.0,
+        sleeper = _ => (),
+        newTmuxServer = _ => rec,
+        newPane = (_, _) => new MockPane(Seq(Seq(F))),
+        err = new PrintStream(OutputStream.nullOutputStream())
+      )
     )
     agent.start(None) shouldBe 0
     agent.pane.nonEmpty shouldBe true
     rec.killSessionNames shouldBe empty
   }
 
-  test("start with killSession stops tmux session via newTmuxServer") {
+  test("start with oneShot stops tmux session via newTmuxServer") {
     val tmp = tmpWorkspace
     val rec = new RecordingTmuxServer("soc")
     val agent = new CursorAgent(
@@ -363,15 +390,18 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       "composer-2",
       tmuxSocket = "soc",
       label = "lab",
-      quiet = true,
-      killSession = true,
-      killRemoteOnStop = true,
-      whichExecutable = _ => trueOnPath,
-      postSendKeysPause = _ => (),
-      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
-      newTmuxServer = _ => rec,
-      newPane = (_, _) => new MockPane(Seq(Seq(F))),
-      err = new PrintStream(OutputStream.nullOutputStream())
+      oneShot = true,
+      config = AgentConfig(
+        quiet = true,
+        killRemoteOnStop = true,
+        whichExecutable = _ => trueOnPath,
+        postSendKeysPause = _ => (),
+        pollIntervalS = 0.0,
+        sleeper = _ => (),
+        newTmuxServer = _ => rec,
+        newPane = (_, _) => new MockPane(Seq(Seq(F))),
+        err = new PrintStream(OutputStream.nullOutputStream())
+      )
     )
     agent.start(None) shouldBe 0
     rec.killSessionNames should contain("lab")
@@ -393,15 +423,18 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       "composer-2",
       tmuxSocket = "soc",
       label = "lab",
-      quiet = true,
-      killSession = false,
-      killRemoteOnStop = false,
-      whichExecutable = _ => trueOnPath,
-      postSendKeysPause = _ => (),
-      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
-      newTmuxServer = _ => rec,
-      newPane = (_, _) => new MockPane(frames),
-      err = new PrintStream(OutputStream.nullOutputStream())
+      oneShot = false,
+      config = AgentConfig(
+        quiet = true,
+        killRemoteOnStop = false,
+        whichExecutable = _ => trueOnPath,
+        postSendKeysPause = _ => (),
+        pollIntervalS = 0.0,
+        sleeper = _ => (),
+        newTmuxServer = _ => rec,
+        newPane = (_, _) => new MockPane(frames),
+        err = new PrintStream(OutputStream.nullOutputStream())
+      )
     )
     globPrompts(tmp) shouldBe empty
     agent.start(Some("prompt-body")) shouldBe 0
