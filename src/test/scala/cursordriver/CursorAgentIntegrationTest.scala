@@ -197,6 +197,37 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       server.hasSession(label) shouldBe false
   }
 
+  test("K4 stop sends Ctrl+C when agent is busy then kills session") {
+    gate()
+    val tmp = tmpWorkspace
+    val (soc, label) = uniqueSessionIds
+    val agent = new CursorAgent(
+      tmp,
+      model,
+      tmuxSocket = soc,
+      label = label,
+      quiet = true,
+      killSession = false
+    )
+    try
+      withTimeout:
+        agent.start(None) shouldBe 0
+        agent.awaitReady(timeoutS = 900)
+        agent.sendPrompt(
+          "Count from 1 to 5000 in your output, one number per line. Do not stop or summarize early.",
+          timeoutS = 900,
+          promptAsFile = false
+        )
+        Thread.sleep(500)
+        assume(agent.isBusy, "agent finished too fast for busy-stop integration test")
+        agent.stop()
+        agent.pane shouldBe empty
+        val server = new TmuxServer(soc)
+        server.hasSession(label) shouldBe false
+    finally
+      if agent.pane.nonEmpty then agent.stop()
+  }
+
   test("send prompt as file single followup") {
     gate()
     val tmp = tmpWorkspace

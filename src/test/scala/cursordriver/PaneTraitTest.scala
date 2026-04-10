@@ -12,6 +12,7 @@ class PaneTraitTest extends AnyFunSuite with Matchers:
         capturedStart = Some(start)
         Seq("a", "b")
       def sendKeys(keys: String, enter: Boolean = false): Unit = ()
+      def sendInterrupt(): Unit = ()
 
     p.captureEntireScrollback() shouldBe Seq("a", "b")
     capturedStart shouldBe Some(-10)
@@ -23,6 +24,7 @@ class PaneTraitTest extends AnyFunSuite with Matchers:
       def capturePane(start: Int = -10): Seq[String] = Seq.empty
       def sendKeys(keys: String, enter: Boolean = false): Unit =
         enterSeen = Some(enter)
+      def sendInterrupt(): Unit = ()
 
     p.sendKeys("x")
     enterSeen shouldBe Some(false)

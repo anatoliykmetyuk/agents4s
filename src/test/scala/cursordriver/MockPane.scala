@@ -7,6 +7,7 @@ final class MockPane(frames: Seq[Seq[String]]) extends Pane:
 
   private var n: Int = 0
   val sendKeysCalls: mutable.Buffer[(String, Boolean)] = mutable.ArrayBuffer.empty
+  var sendInterruptCount: Int = 0
 
   override def capturePane(start: Int = -10): Seq[String] =
     val out =
@@ -19,5 +20,8 @@ final class MockPane(frames: Seq[Seq[String]]) extends Pane:
 
   override def sendKeys(keys: String, enter: Boolean = false): Unit =
     sendKeysCalls += ((keys, enter))
+
+  override def sendInterrupt(): Unit =
+    sendInterruptCount += 1
 
 end MockPane

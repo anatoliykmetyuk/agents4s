@@ -76,6 +76,9 @@ final class TmuxPane(socketName: String, target: String) extends Pane:
     if keys.nonEmpty then run(tmux("send-keys", "-t", target, "-l", keys))
     if enter then run(tmux("send-keys", "-t", target, "C-m"))
 
+  override def sendInterrupt(): Unit =
+    run(tmux("send-keys", "-t", target, "C-c"))
+
 end TmuxPane
 
 object Paths:

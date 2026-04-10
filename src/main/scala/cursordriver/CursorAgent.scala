@@ -51,14 +51,35 @@ class CursorAgent(
     pane.getOrElse:
       throw new RuntimeException("CursorAgent is not started; call start() first")
 
-  def stop(): Unit =
-    if killRemoteOnStop then
+  def stop(interruptAttempts: Int = 10): Unit =
+    pane match
+      case None => ()
+      case Some(p) =>
+        try
+          val text = TuiOps.tailText(p, nLines = 20)(using tuiConfig)
+          if TuiOps.isBusy(text) then interruptUntilIdle(p, interruptAttempts)
+        catch case _: Exception => ()
+
+        if killRemoteOnStop then
+          try
+            val tmux = newTmuxServer(tmuxSocket)
+            tmux.killSession(label)
+          catch case _: Exception => ()
+        cleanupAllPromptFiles()
+        pane = None
+    end match
+  end stop
+
+  private def interruptUntilIdle(p: Pane, maxAttempts: Int): Unit =
+    var remaining = maxAttempts
+    while remaining > 0 do
       try
-        val tmux = newTmuxServer(tmuxSocket)
-        tmux.killSession(label)
-      catch case _: Exception => ()
-    cleanupAllPromptFiles()
-    pane = None
+        p.sendInterrupt()
+        tuiConfig.sleeper(tuiConfig.pollIntervalS)
+        val text = TuiOps.tailText(p, nLines = 20)(using tuiConfig)
+        if !TuiOps.isBusy(text) then return
+      catch case _: Exception => return
+      remaining -= 1
 
   def isTrustPrompt: Boolean =
     TuiOps.isTrustPrompt(TuiOps.tailText(requirePane, nLines = 20)(using tuiConfig))

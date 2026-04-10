@@ -10,3 +10,6 @@ trait Pane:
   def captureEntireScrollback(): Seq[String] = capturePane(start = -10)
 
   def sendKeys(keys: String, enter: Boolean = false): Unit
+
+  /** Send SIGINT-style interrupt (tmux: send-keys C-c). */
+  def sendInterrupt(): Unit

@@ -212,8 +212,124 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
       postSendKeysPause = _ => ()
     )
+    agent.pane = Some(new MockPane(Seq(Seq(F))))
     agent.stop()
     rec.killSessionNames.toList shouldBe List("my-lab")
+  }
+
+  test("stop on dead agent does not kill session or clear nonexistent pane") {
+    val tmp = tmpWorkspace
+    val rec = new RecordingTmuxServer("sock")
+    val agent = new CursorAgent(
+      tmp,
+      "composer-2",
+      tmuxSocket = "sock",
+      label = "my-lab",
+      killSession = false,
+      killRemoteOnStop = true,
+      newTmuxServer = _ => rec,
+      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
+      postSendKeysPause = _ => ()
+    )
+    agent.pane shouldBe empty
+    agent.stop()
+    rec.killSessionNames shouldBe empty
+    agent.pane shouldBe empty
+  }
+
+  test("stop on alive idle agent skips interrupt") {
+    val tmp = tmpWorkspace
+    val rec = new RecordingTmuxServer("sock")
+    val agent = new CursorAgent(
+      tmp,
+      "composer-2",
+      tmuxSocket = "sock",
+      label = "lab",
+      killSession = false,
+      killRemoteOnStop = false,
+      newTmuxServer = _ => rec,
+      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
+      postSendKeysPause = _ => ()
+    )
+    val pane = new MockPane(Seq((Seq.fill(19)("pad") :+ F).toSeq))
+    agent.pane = Some(pane)
+    agent.stop()
+    pane.sendInterruptCount shouldBe 0
+    agent.pane shouldBe empty
+  }
+
+  test("stop on alive busy agent sends interrupt until idle") {
+    val tmp = tmpWorkspace
+    val rec = new RecordingTmuxServer("sock")
+    val agent = new CursorAgent(
+      tmp,
+      "composer-2",
+      tmuxSocket = "sock",
+      label = "lab",
+      killSession = false,
+      killRemoteOnStop = true,
+      newTmuxServer = _ => rec,
+      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
+      postSendKeysPause = _ => ()
+    )
+    val busyTail = (Seq.fill(19)("pad") :+ B).toSeq
+    val readyTail = (Seq.fill(19)("pad") :+ F).toSeq
+    val pane = new MockPane(Seq(busyTail, readyTail))
+    agent.pane = Some(pane)
+    agent.stop(interruptAttempts = 10)
+    pane.sendInterruptCount should be > 0
+    rec.killSessionNames.toList shouldBe List("lab")
+    agent.pane shouldBe empty
+  }
+
+  test("stop on alive busy agent exhausts interrupt attempts then tears down") {
+    val tmp = tmpWorkspace
+    val rec = new RecordingTmuxServer("sock")
+    val max = 4
+    val agent = new CursorAgent(
+      tmp,
+      "composer-2",
+      tmuxSocket = "sock",
+      label = "lab",
+      killSession = false,
+      killRemoteOnStop = true,
+      newTmuxServer = _ => rec,
+      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
+      postSendKeysPause = _ => ()
+    )
+    val busyTail = (Seq.fill(19)("pad") :+ B).toSeq
+    val pane = new MockPane(Seq(busyTail))
+    agent.pane = Some(pane)
+    agent.stop(interruptAttempts = max)
+    pane.sendInterruptCount shouldBe max
+    rec.killSessionNames.toList shouldBe List("lab")
+    agent.pane shouldBe empty
+  }
+
+  test("stop when pane capture throws still tears down") {
+    val tmp = tmpWorkspace
+    val rec = new RecordingTmuxServer("sock")
+    val agent = new CursorAgent(
+      tmp,
+      "composer-2",
+      tmuxSocket = "sock",
+      label = "lab",
+      killSession = false,
+      killRemoteOnStop = true,
+      newTmuxServer = _ => rec,
+      tuiConfig = TuiConfig(pollIntervalS = 0.0, sleeper = _ => ()),
+      postSendKeysPause = _ => ()
+    )
+    val pane = new Pane:
+      def capturePane(start: Int = -10): Seq[String] =
+        throw new RuntimeException("capture failed")
+      def sendKeys(keys: String, enter: Boolean = false): Unit = ()
+      def sendInterrupt(): Unit = ()
+
+    agent.pane = Some(pane)
+    agent.stop()
+    rec.killSessionNames.toList shouldBe List("lab")
+    agent.pane shouldBe empty
   }
 
   test("start without prompt uses newPane and returns 0") {
