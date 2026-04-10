@@ -67,6 +67,7 @@ For incremental adds: locate existing actors and **only** add new files + minima
 For **each** actor:
 
 - Put **all** incoming and outgoing message types in **`object ActorName`** (where `ActorName` is the name of the actor) as sealed traits + case classes (and traits for intents with multiple cases), as in [references/actor-guide.md](references/actor-guide.md).
+- **Vertical layout:** group by **sealed family**. Put **no** blank lines between the sealed parent and its subtypes, or between siblings of the same sum type. Use **one** blank line **only** between unrelated groups (e.g. after the last `BlockReason` before `sealed trait Source`, after message ADTs and before a non-message helper such as `Ctx`). Do not double-space every case class— that obscures structure.
 - Reference them everywhere as **`ActorName.MessageName`** (e.g. `WorkerA.InspectRequest`, `Orchestrator.WorkRequest`). **No** separate `protocol/` package.
 - Requests that need replies include `replyTo: ActorRef[SomeResponse]` (or use adapters—see actor guide).
 
@@ -97,7 +98,7 @@ Follow [references/testing.md](references/testing.md): `ActorTestKit`, `TestProb
 - [ ] `scripts/setup.sh`, `scripts/run.sh`, `scripts/test.sh` exist and `cd` to project root.
 - [ ] `build.sbt` includes Pekko Typed + agents4s (+ JSON lib if used).
 - [ ] `src/main/resources/application.conf` defines blocking dispatcher for bridge.
-- [ ] Messages only in companion objects; cross-refs use `ActorName.MessageName`.
+- [ ] Messages only in companion objects; cross-refs use `ActorName.MessageName`; **blank lines only between sealed families** (see [references/actor-guide.md](references/actor-guide.md)).
 - [ ] Agentic steps have `prompts/` templates with machine-readable output instructions.
 - [ ] No blocking `CursorAgent` calls on the default actor dispatcher.
 - [ ] `out/` gitignored; `./scripts/test.sh` passes.

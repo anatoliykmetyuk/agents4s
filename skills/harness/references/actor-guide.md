@@ -8,6 +8,14 @@ Use Scala 3 and **Apache Pekko Typed**. Each **actor** is a Scala `class` (or `o
 - No separate “global protocol” package that grows unbounded.
 - Cross-actor types stay explicit: `WorkerA.InspectResponse` in `Orchestrator` code documents the dependency.
 
+## Visual grouping (blank lines)
+
+In the companion `object`, **tight-pack** each **sealed sum type** and all its direct subtypes: **no** blank line between the `sealed trait` and its `case class` / `case object` lines, and **no** blank line between sibling cases of that same parent.
+
+Put **one** blank line **only** when you move to a **different** sum type or to **non-message** members (e.g. a private `Ctx` state holder, `def apply`). Avoid “double spacing” every message—it reads like unrelated top-level declarations and hides which variants belong together.
+
+Order ADTs so dependencies read naturally (e.g. define `InspectResponse` before `Command` if `Command` references it in field types).
+
 ## Minimal skeleton
 
 ```scala
@@ -19,17 +27,16 @@ import org.apache.pekko.actor.typed.scaladsl.*
 
 object WorkerA:
 
-  /** All messages this actor accepts (sealed avoids exhaustiveness mistakes). */
-  sealed trait Command
-  final case class InspectRequest(path: java.nio.file.Path, replyTo: ActorRef[InspectResponse])
-      extends Command
-
-  /** Responses sent to `replyTo` from InspectRequest */
+  /** Replies for InspectRequest */
   sealed trait InspectResponse
   case object AlreadyDone extends InspectResponse
   final case class NeedsWork(details: String) extends InspectResponse
 
-  /** Internal async completion (example) — not part of public API */
+  /** All messages this actor accepts */
+  sealed trait Command
+  final case class InspectRequest(path: java.nio.file.Path, replyTo: ActorRef[InspectResponse])
+      extends Command
+  /** Internal async completion — not part of public API */
   private final case class InspectCompleted(response: InspectResponse, replyTo: ActorRef[InspectResponse])
       extends Command
 
