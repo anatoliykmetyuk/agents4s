@@ -11,7 +11,11 @@ description: >
   agents/actors with message interfaces and wants runnable Scala, or when they
   want to add a new actor to an existing actor-based harness project--even if
   they do not say "Pekko" or "actor" by name but describe spawning workers,
-  validators, orchestrators, or subagents.
+  validators, orchestrators, or subagents. Typical asks: harness specs/ into a
+  full runnable project (scripts/, companion messages, LlmBridge, prompts,
+  tests); add a new actor from a freshly added specs/*.md with minimal churn
+  elsewhere; or outline specs for a multi-actor flow (e.g. routing,
+  classification, drafting) then scaffold to Scala.
 ---
 
 # Harness — actor specs to Pekko (Scala 3)
@@ -107,4 +111,3 @@ Follow [references/testing.md](references/testing.md): `ActorTestKit`, `TestProb
 
 - **Cursor / repo copy:** this folder ships with [agents4s](.); `build.sbt` uses `publishLocal` artifacts.
 - **CursorAgent API:** treat [references/llm-bridge-guide.md](references/llm-bridge-guide.md) as the **canonical public API** summary for harness work (`Agent`, `CursorAgent`, `AgentConfig`, bridge examples). When agents4s changes, update that guide so users never need to hunt the library sources.
-- **Eval prompts:** see [evals/evals.json](evals/evals.json). For description tuning, see [references/trigger-eval-set.json](references/trigger-eval-set.json) and the skill-creator `run_loop` (optional).
