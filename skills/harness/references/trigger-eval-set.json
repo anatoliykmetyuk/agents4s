@@ -1,0 +1,22 @@
+[
+  {"query": "ok so we have this whole specs/ folder with markdown for each bot role and my coworker said we should pekko it and hook cursor agents for the fuzzy steps — can you wire that up in scala", "should_trigger": true},
+  {"query": "I need to add specs/02-5-quality-gate.md to our harness repo and have it compile as another actor that the pipeline messages after build", "should_trigger": true},
+  {"query": "turn my org's actor markdown pack into a runnable sbt thing with actors4s for the llm bits and non-blocking bridge", "should_trigger": true},
+  {"query": "harness this SOP: clone repo, run tests, open PR — single Main.scala sequential script no actors", "should_trigger": true},
+  {"query": "We're standardizing on specs/*.md as source of truth for microservices; generate OpenAPI from those files", "should_trigger": false},
+  {"query": "read specs/config.yaml and deploy to k8s using helm", "should_trigger": false},
+  {"query": "add pekko persistence to our inventory service — no markdown specs involved", "should_trigger": false},
+  {"query": "write a python script that calls openai api in a loop — not scala harness", "should_trigger": false},
+  {"query": "I have actor specs in Notion; export to md under specs/ and scaffold the typed actor project like our harness skill says", "should_trigger": true},
+  {"query": "cursor agent keeps timing out in tmux — debug agents4s only no actor system", "should_trigger": false},
+  {"query": "greenfield: create specs/ for orchestrator + validator + worker from this wiki page then full harness", "should_trigger": true},
+  {"query": "refactor our legacy akka project to pekko — no specs folder", "should_trigger": false},
+  {"query": "incremental: new child actor WorkerC per specs/01-3-worker-c.md already written", "should_trigger": true},
+  {"query": "generate mermaid diagram only from specs/ — no code", "should_trigger": false},
+  {"query": "I said harness but I mean 'wrap this bash script in scala' one file no pekko", "should_trigger": false},
+  {"query": "set up pre-commit for our repo — unrelated", "should_trigger": false},
+  {"query": "make sure ActorName.MessageName pattern everywhere and LlmBridge uses blocking dispatcher", "should_trigger": true},
+  {"query": "write kotlin coroutines version of our ticket router — not this skill", "should_trigger": false},
+  {"query": "skills/harness folder in repo — document how install-skill.sh publishes agents4s", "should_trigger": false},
+  {"query": "multimodule sbt: one module is specs-driven harness with scripts/ setup run test", "should_trigger": true}
+]

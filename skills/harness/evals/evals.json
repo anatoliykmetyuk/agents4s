@@ -1,0 +1,23 @@
+{
+  "skill_name": "harness",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a folder of actor specs at `/path/to/my-project/specs` with 4 markdown files describing an orchestrator and 3 worker actors. Harness this into a running Pekko Typed + agents4s project: scripts under scripts/, companion-object messages, LlmBridge, prompts, and tests.",
+      "expected_output": "Full project layout per SKILL.md: specs/, scripts/*.sh, build.sbt with pekko-actor-typed + agents4s, application.conf with blocking dispatcher, one Scala file per actor with // Spec link, companion messages as ActorName.MessageName, bidirectional <!-- impl: --> in specs, prompts for agentic steps, references/testing.md-style unit tests without real CursorAgent.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I just added `specs/01-4-the-reviewer.md` to my existing harness. It receives ReviewRequest and responds with Approved or NeedsChanges(concerns). The orchestrator should spawn it after the worker finishes. Implement only what is new; keep existing actors unchanged.",
+      "expected_output": "New Reviewer.scala (or TheReviewer.scala) with messages in companion object; orchestrator updated to use Reviewer.ReviewRequest etc.; new prompt template if agentic; spec gets <!-- impl: --> link; no unrelated refactors.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I want an actor system for customer support: a Dispatcher routes tickets, a Classifier uses an LLM to categorize, and a Responder drafts replies. Help me create the specs/ folder content and then harness it to Scala.",
+      "expected_output": "User guided to write specs/*.md (supporting specs optional, e.g. 00-*, plus one file per actor) with Behavior and Procedure; then scaffold matching Pekko project per SKILL.md checklist.",
+      "files": []
+    }
+  ]
+}
