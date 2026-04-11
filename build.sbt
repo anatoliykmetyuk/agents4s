@@ -2,7 +2,7 @@ val scala3Version = "3.8.3"
 
 /** Max concurrent tests per suite (ScalaTest `-P`, all suites). SCALATEST_PARALLELISM, else INTEGRATION_PARALLELISM, else 5. */
 val scalaTestParallelism =
-  sys.env.get("SCALATEST_PARALLELISM").orElse(sys.env.get("INTEGRATION_PARALLELISM")).getOrElse("5")
+  sys.env.get("SCALATEST_PARALLELISM").orElse(sys.env.get("INTEGRATION_PARALLELISM")).getOrElse("10")
 
 ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := scala3Version
