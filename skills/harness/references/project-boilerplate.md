@@ -36,9 +36,9 @@ exec sbt test "$@"
 
 ## `build.sbt` (snippet)
 
-**agents4s** and **agents4s-pekko** are **local SNAPSHOT** artifacts (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in the agents4s repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes.
+**agents4s-core** and **agents4s-pekko** are **local SNAPSHOT** artifacts (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in this repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes.
 
-**Pekko** — Apache Pekko Typed for Scala 3 (adjust version if needed). Use **`me.anatoliikmt` %% `agents4s-pekko`** for the heartbeat **`LlmBridge`** actor (see [llm-bridge-guide.md](llm-bridge-guide.md)); it depends on **`agents4s`** transitively.
+**Pekko** — Apache Pekko Typed for Scala 3 (adjust version if needed). Use **`me.anatoliikmt` %% `agents4s-pekko`** for the heartbeat **`LlmBridge`** actor (see [llm-bridge-guide.md](llm-bridge-guide.md)); it depends on **`agents4s-core`** transitively.
 
 ```scala
 val scala3Version = "3.8.3"

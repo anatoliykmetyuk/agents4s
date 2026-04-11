@@ -109,5 +109,5 @@ Follow [references/testing.md](references/testing.md): `ActorTestKit`, `TestProb
 
 ## Maintainer notes
 
-- **Cursor / repo copy:** this folder ships with [agents4s](.); `build.sbt` uses `publishLocal` artifacts.
+- **Cursor / repo copy:** this folder ships with the [agents4s-core](../../agents4s-core) module in this repo; `build.sbt` uses `publishLocal` artifacts.
 - **CursorAgent API:** treat [references/llm-bridge-guide.md](references/llm-bridge-guide.md) as the **canonical public API** summary for harness work (`Agent`, `CursorAgent`, `AgentConfig`, bridge examples). When agents4s changes, update that guide so users never need to hunt the library sources.

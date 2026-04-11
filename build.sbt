@@ -18,9 +18,9 @@ lazy val root = project
   )
 
 lazy val core = project
-  .in(file("agents4s"))
+  .in(file("agents4s-core"))
   .settings(
-    name := "agents4s",
+    name := "agents4s-core",
     Test / fork := true,
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "os-lib" % "0.11.8",

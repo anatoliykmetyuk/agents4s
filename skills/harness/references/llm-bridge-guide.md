@@ -6,7 +6,7 @@
 
 ## agents4s API reference
 
-Core types are from **`me.anatoliikmt`** artifact **`agents4s`**; the reusable Pekko bridge is **`me.anatoliikmt` %% `agents4s-pekko`** (see [project-boilerplate.md](project-boilerplate.md)).
+Core types are from **`me.anatoliikmt`** artifact **`agents4s-core`**; the reusable Pekko bridge is **`me.anatoliikmt` %% `agents4s-pekko`** (see [project-boilerplate.md](project-boilerplate.md)).
 
 ### `agents4s.Agent` (trait)
 
