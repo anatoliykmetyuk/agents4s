@@ -1,5 +1,9 @@
 val scala3Version = "3.8.3"
 
+/** Max concurrent tests per suite (ScalaTest `-P`, all suites). SCALATEST_PARALLELISM, else INTEGRATION_PARALLELISM, else 5. */
+val scalaTestParallelism =
+  sys.env.get("SCALATEST_PARALLELISM").orElse(sys.env.get("INTEGRATION_PARALLELISM")).getOrElse("10")
+
 ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := scala3Version
 ThisBuild / organization := "me.anatoliikmt"
@@ -23,11 +27,10 @@ lazy val core = project
     name := "agents4s-core",
     Test / fork := true,
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %% "os-lib" % "0.11.8",
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
     ),
     Test / testOptions ++= Seq(
-      Tests.Argument(TestFrameworks.ScalaTest, "-oDF"),
+      Tests.Argument(TestFrameworks.ScalaTest, "-oDF", s"-P$scalaTestParallelism"),
     ),
   )
 
@@ -45,6 +48,6 @@ lazy val pekko = project
       "com.lihaoyi" %% "upickle-jsonschema" % "4.4.3",
     ),
     Test / testOptions ++= Seq(
-      Tests.Argument(TestFrameworks.ScalaTest, "-oDF"),
+      Tests.Argument(TestFrameworks.ScalaTest, "-oDF", s"-P$scalaTestParallelism"),
     ),
   )

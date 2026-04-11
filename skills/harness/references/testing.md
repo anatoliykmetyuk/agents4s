@@ -6,7 +6,7 @@ Actor-system harnesses should stay **fast and deterministic** in CI: no real **`
 
 1. **Unit tests:** `ActorTestKit`, `BehaviorTestKit`, `TestProbe`; **mock** the LLM port.
 2. **Integration tests (optional):** separate suite, gated by env var if you ever drive a real agent—same pattern as agents4s integration tests.
-3. **Real filesystem** under `Files.createTempDirectory` / `os.Path` when testing file workflows.
+3. **Real filesystem** under `Files.createTempDirectory` / `java.nio.file.Path` when testing file workflows.
 4. **Thin seams:** define a small `LlmPort` (or pass a stub `Behavior`) so production uses `LlmBridge` + `CursorAgent` and tests return canned results.
 
 ## Layers
@@ -46,12 +46,11 @@ Match the **`LlmPort`** shape from [llm-bridge-guide.md](llm-bridge-guide.md). P
 
 ```scala
 import scala.concurrent.{ExecutionContext, Future}
-import agents4s.Agent
 
 final class MockLlmPort(
     result: Either[String, Option[String]] = Right(Some("{\"status\":\"OK\"}"))
 ) extends LlmPort:
-  def runOneShot(prompt: String, workspace: os.Path, model: String, timeoutS: Double)(using
+  def runOneShot(prompt: String, workspace: java.nio.file.Path, model: String, timeoutS: Double)(using
       ec: ExecutionContext
   ): Future[Either[String, Option[String]]] =
     Future.successful(result)
@@ -64,7 +63,6 @@ import java.nio.file.Files
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.DispatcherSelector
-import agents4s.Agent
 import org.scalatest.wordspec.AnyWordSpec
 
 class LlmBridgeTest extends ScalaTestWithActorTestKit with AnyWordSpec:
@@ -72,7 +70,7 @@ class LlmBridgeTest extends ScalaTestWithActorTestKit with AnyWordSpec:
   private def blockingEc =
     system.dispatchers.lookup(DispatcherSelector.fromConfig("blocking-llm-dispatcher"))
 
-  private def tmpWorkspace: os.Path = os.Path(Files.createTempDirectory("llm-bridge-test"))
+  private def tmpWorkspace: java.nio.file.Path = Files.createTempDirectory("llm-bridge-test")
 
   "LlmBridge" should {
     "reply Ok when the port succeeds" in {
@@ -84,7 +82,7 @@ class LlmBridgeTest extends ScalaTestWithActorTestKit with AnyWordSpec:
         workspace = ws,
         readOutputPath = None,
         model = "noop",
-        timeoutS = Agent.DefaultTimeoutS,
+        timeoutS = 30 * 60,
         replyTo = probe.ref
       )
       probe.expectMessage(LlmBridge.Ok(0, Some("artifact")))
@@ -94,7 +92,7 @@ class LlmBridgeTest extends ScalaTestWithActorTestKit with AnyWordSpec:
       val probe = createTestProbe[LlmBridge.Result]()
       val ws = tmpWorkspace
       val bridge = spawn(LlmBridge(new MockLlmPort(Left("boom")), blockingEc))
-      bridge ! LlmBridge.Run("p", ws, None, "m", Agent.DefaultTimeoutS, probe.ref)
+      bridge ! LlmBridge.Run("p", ws, None, "m", 30 * 60, probe.ref)
       probe.expectMessage(LlmBridge.Failed("boom"))
     }
   }
@@ -105,7 +103,7 @@ If you don’t load **`application.conf`** in tests, either merge a `application
 ## Shared fixtures
 
 - One `ActorTestKit` per test class (`afterAll`: `testKit.shutdownTestKit()`).
-- Reuse a helper `def tmpWorkspace: os.Path` for workspace-root tests.
+- Reuse a helper `def tmpWorkspace: java.nio.file.Path` for workspace-root tests.
 - Keep **prompt templates** under `prompts/` in fixture dirs only if assertions need template text.
 
 ## Checklist

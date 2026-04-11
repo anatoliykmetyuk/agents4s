@@ -1,6 +1,9 @@
 package agents4s.pekko
 
-import scala.concurrent.duration.DurationInt
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+
+import scala.concurrent.duration.*
 
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -38,16 +41,18 @@ Output in the precise format specified above.
       outputInstructions: String
   ): Behavior[HeartbeatTick.type] =
     Behaviors.withTimers: timers =>
-      agent.start(Some(inputPrompt))
+      agent.start()
+      agent.awaitIdle(100.seconds, pollInterval = 100.millis)
+      agent.sendPrompt(inputPrompt, promptAsFile = true)
       timers.startTimerWithFixedDelay(HeartbeatTimerKey, HeartbeatTick, 1.second)
       awaitDone[O](replyTo, agent, outputInstructions)
 
   private def promptToWriteResult[O: JsonSchema: ReadWriter](
       agent: Agent,
       outputInstructions: String
-  ): os.Path =
+  ): java.nio.file.Path =
     val schema = upickle.default.schema[O].toString
-    val resultFilePath = os.temp()
+    val resultFilePath = Files.createTempFile("agents4s-llm-result-", ".json")
     val prompt = PromptTemplate.substitute(
       ResultPromptTemplate,
       Map(
@@ -73,7 +78,7 @@ Output in the precise format specified above.
   private def awaitResultWritten[O: JsonSchema: ReadWriter](
       replyTo: ActorRef[O | LLMError],
       agent: Agent,
-      resultFilePath: os.Path,
+      resultFilePath: java.nio.file.Path,
       outputInstructions: String,
       attemptNo: Int = 1,
       maxAttempts: Int = 3
@@ -82,7 +87,7 @@ Output in the precise format specified above.
       if agent.isBusy then Behaviors.same
       else
         try
-          val fileContents = os.read(resultFilePath)
+          val fileContents = Files.readString(resultFilePath, StandardCharsets.UTF_8)
           val deserialized = upickle.default.read[O](fileContents)
           replyTo ! deserialized
           Behaviors.stopped

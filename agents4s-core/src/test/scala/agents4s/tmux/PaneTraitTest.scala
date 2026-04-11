@@ -1,9 +1,10 @@
 package agents4s.tmux
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-class PaneTraitTest extends AnyFunSuite with Matchers:
+class PaneTraitTest extends AnyFunSuite with Matchers with ParallelTestExecution:
 
   test("captureEntireScrollback delegates to capturePane(start = -10)") {
     var capturedStart: Option[Int] = None

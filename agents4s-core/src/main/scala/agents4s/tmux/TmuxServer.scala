@@ -1,9 +1,8 @@
 package agents4s.tmux
 
 import java.util.regex.Pattern
-
-import os.*
-import scala.language.implicitConversions
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Path}
 
 object TmuxServer:
 
@@ -12,9 +11,21 @@ object TmuxServer:
   def stripAnsi(text: String): String =
     ansiRe.matcher(text).replaceAll("")
 
-  /** Matches tmux: TMUX_TMPDIR or /tmp, then tmux-$(id -u), then -L socket file name. */
-  private lazy val unixUserId: String =
-    proc(Seq("id", "-u").map(s => s: Shellable)*).call().out.text().trim
+  /** Cached `id -u` for default tmux socket path layout. */
+  lazy val unixUserId: String =
+    runProcess(Seq("id", "-u"), check = true)._2.trim
+
+  private[tmux] def runProcess(cmd: Seq[String], check: Boolean): (Int, String) =
+    val pb = new ProcessBuilder(cmd*)
+    pb.redirectErrorStream(true)
+    val proc = pb.start()
+    val stdout = new String(proc.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
+    val exit = proc.waitFor()
+    if check && exit != 0 then
+      throw new RuntimeException(
+        s"command failed: ${cmd.mkString(" ")} (exit $exit)\n$stdout"
+      )
+    (exit, stdout)
 
 end TmuxServer
 
@@ -23,18 +34,18 @@ class TmuxServer(socketName: String):
   private def tmux(extra: String*): Seq[String] =
     Seq("tmux", "-L", socketName) ++ extra
 
-  private def run(cmd: Seq[String], check: Boolean = true): os.CommandResult =
-    proc(cmd.map(s => s: Shellable)*).call(check = check)
+  private def run(cmd: Seq[String], check: Boolean = true): (Int, String) =
+    TmuxServer.runProcess(cmd, check)
 
   /** Path to the tmux server socket file for this `-L` name (if the server were running). */
   private def socketFile: Path =
-    val base = sys.env.get("TMUX_TMPDIR").map(Path(_)).getOrElse(Path("/tmp"))
-    base / s"tmux-${TmuxServer.unixUserId}" / socketName
+    val base = sys.env.get("TMUX_TMPDIR").map(Path.of(_)).getOrElse(Path.of("/tmp"))
+    base.resolve(s"tmux-${TmuxServer.unixUserId}").resolve(socketName)
 
-  def socketExists: Boolean = os.exists(socketFile)
+  def socketExists: Boolean = Files.exists(socketFile)
 
   def hasSession(sessionName: String): Boolean =
-    socketExists && run(tmux("has-session", "-t", sessionName), check = false).exitCode == 0
+    socketExists && run(tmux("has-session", "-t", sessionName), check = false)._1 == 0
 
   def killSession(sessionName: String): Unit =
     if hasSession(sessionName) then
@@ -60,12 +71,11 @@ final class TmuxPane(socketName: String, target: String) extends Pane:
   private def tmux(extra: String*): Seq[String] =
     Seq("tmux", "-L", socketName) ++ extra
 
-  private def run(cmd: Seq[String]): os.CommandResult =
-    proc(cmd.map(s => s: Shellable)*).call()
+  private def run(cmd: Seq[String]): (Int, String) =
+    TmuxServer.runProcess(cmd, check = true)
 
   override def capturePane(start: Int = -10): Seq[String] =
-    val out = run(tmux("capture-pane", "-p", "-t", target, "-S", start.toString))
-    val text = out.out.text()
+    val (_, text) = run(tmux("capture-pane", "-p", "-t", target, "-S", start.toString))
     if text.isEmpty then Seq.empty
     else
       val raw = text.stripTrailing()
@@ -73,8 +83,7 @@ final class TmuxPane(socketName: String, target: String) extends Pane:
       else raw.split("\n", -1).toSeq
 
   override def captureEntireScrollback(): Seq[String] =
-    val out = run(tmux("capture-pane", "-p", "-t", target, "-S", "-", "-E", "-"))
-    val text = out.out.text()
+    val (_, text) = run(tmux("capture-pane", "-p", "-t", target, "-S", "-", "-E", "-"))
     if text.isEmpty then Seq.empty
     else text.stripTrailing().split("\n", -1).toSeq
 
@@ -91,8 +100,11 @@ object Paths:
 
   /** Resolve first executable named `name` on PATH (like shutil.which). */
   def which(name: String): Option[String] =
-    val res = proc(Seq("sh", "-c", s"command -v $name").map(s => s: Shellable)*).call(check = false)
-    if res.exitCode == 0 then Some(res.out.text().trim)
+    val (code, out) = TmuxServer.runProcess(
+      Seq("sh", "-c", s"command -v $name"),
+      check = false
+    )
+    if code == 0 then Some(out.trim)
     else None
 
 end Paths

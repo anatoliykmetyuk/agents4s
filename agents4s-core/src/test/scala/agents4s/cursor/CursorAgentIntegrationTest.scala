@@ -1,21 +1,27 @@
 package agents4s.cursor
 
-import java.io.ByteArrayOutputStream
-import java.io.PrintStream
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.UUID
 import java.util.regex.Pattern
 
-import agents4s.tmux.{AgentConfig, Paths, TmuxServer}
+import scala.concurrent.duration.*
+
+import agents4s.tmux.{Paths, TmuxServer}
 
 import org.scalatest.Assertions.{assume, withClue}
+import org.scalatest.ParallelTestExecution
 import org.scalatest.concurrent.TimeLimits
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar.*
 
-class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimits:
+class CursorAgentIntegrationTest
+    extends AnyFunSuite
+    with Matchers
+    with TimeLimits
+    with ParallelTestExecution:
 
   private val model: String =
     sys.env.getOrElse("CURSOR_DRIVER_MODEL", "composer-2-fast")
@@ -28,34 +34,27 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     assume(Paths.which("agent").nonEmpty, "Cursor `agent` CLI not on PATH")
     assume(Paths.which("tmux").nonEmpty, "tmux not on PATH")
 
-  private def tmpWorkspace: os.Path =
-    os.Path(Files.createTempDirectory("agents4s-int").toFile)
+  private def tmpWorkspace: java.nio.file.Path =
+    Files.createTempDirectory("agents4s-int")
 
   private def uniqueSessionIds: (String, String) =
     val u = UUID.randomUUID().toString.replace("-", "").take(12)
     (s"cd-test-$u", s"cd-$u")
 
   private def withTimeout[T](body: => T): T =
-    failAfter(Span(900, org.scalatest.time.Seconds))(body)
+    failAfter(Span(100, org.scalatest.time.Seconds))(body)
 
   test("I1 cold start await ready") {
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.pane.nonEmpty shouldBe true
-        agent.awaitReady(timeoutS = 900)
-        agent.isReady shouldBe true
+        agent.start()
+        agent.isStarted shouldBe true
+        agent.awaitIdle(100.seconds)
+        agent.isIdle shouldBe true
         agent.isTrustPrompt shouldBe false
     finally agent.stop()
   }
@@ -64,45 +63,15 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.pane.nonEmpty shouldBe true
+        agent.start()
+        agent.isStarted shouldBe true
         val _ = agent.isTrustPrompt
-        agent.awaitReady(timeoutS = 900)
-        agent.isReady shouldBe true
+        agent.awaitIdle(100.seconds)
+        agent.isIdle shouldBe true
     finally agent.stop()
-  }
-
-  test("I3 start with prompt one shot") {
-    gate()
-    val tmp = tmpWorkspace
-    val (soc, label) = uniqueSessionIds
-    val proof = tmp / "proof_integration.txt"
-    val instruction =
-      s"""Create a file at exactly this path with UTF-8 content OK:\\n$proof\\nReply with a single word DONE when finished."""
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = true,
-      config = AgentConfig(quiet = true)
-    )
-    withTimeout:
-      val rc = agent.start(Some(instruction))
-      rc shouldBe 0
-      if os.isFile(proof) then
-        val text = os.read(proof).strip()
-        (text.contains("OK") || text == "OK") shouldBe true
   }
 
   for (turns <- Seq(1, 2))
@@ -110,123 +79,39 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       gate()
       val tmp = tmpWorkspace
       val (soc, label) = uniqueSessionIds
-      val log = tmp / "turn_log.txt"
-      val agent = new CursorAgent(
-        tmp,
-        model,
-        tmuxSocket = soc,
-        label = label,
-        oneShot = false,
-        config = AgentConfig(quiet = true)
-      )
+      val log = tmp.resolve("turn_log.txt")
+      val agent = new CursorAgent(tmp, model, socket = soc, label = label)
       try
         withTimeout:
-          agent.start(None) shouldBe 0
-          agent.awaitReady(timeoutS = 900)
+          agent.start()
+          agent.awaitIdle(100.seconds)
           for (t <- 0 until turns)
-            agent.isReady shouldBe true
+            agent.isIdle shouldBe true
             val token = UUID.randomUUID().toString.replace("-", "").take(8)
             agent.sendPrompt(
               s"Append exactly one line to $log: TURN $t $token\\nThen stop. Reply DONE.",
-              timeoutS = 900
+              promptAsFile = true
             )
-            agent.awaitDone(timeoutS = 900)
-            agent.awaitReady(timeoutS = 900)
-            agent.isReady shouldBe true
-            if os.isFile(log) then
-              val content = os.read(log)
+            agent.awaitIdle(100.seconds)
+            agent.isIdle shouldBe true
+            if Files.isRegularFile(log) then
+              val content = Files.readString(log, StandardCharsets.UTF_8)
               content should include(token)
       finally agent.stop()
     }
 
-  test("K1 kill session true session removed") {
+  test("K3 stop kills session") {
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = true,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     withTimeout:
-      agent.start(None) shouldBe 0
-      val server = new TmuxServer(soc)
-      server.hasSession(label) shouldBe false
-  }
-
-  test("K2 kill session false session survives") {
-    gate()
-    val tmp = tmpWorkspace
-    val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
-    try
-      withTimeout:
-        agent.start(None) shouldBe 0
-        val server = new TmuxServer(soc)
-        server.hasSession(label) shouldBe true
-    finally agent.stop()
-  }
-
-  test("K3 stop kills session when kill session false") {
-    gate()
-    val tmp = tmpWorkspace
-    val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
-    withTimeout:
-      agent.start(None) shouldBe 0
-      agent.pane.nonEmpty shouldBe true
+      agent.start()
+      agent.isStarted shouldBe true
       agent.stop()
-      agent.pane shouldBe empty
+      agent.isStarted shouldBe false
       val server = new TmuxServer(soc)
       server.hasSession(label) shouldBe false
-  }
-
-  test("K4 stop sends Ctrl+C when agent is busy then kills session") {
-    gate()
-    val tmp = tmpWorkspace
-    val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
-    try
-      withTimeout:
-        agent.start(None) shouldBe 0
-        agent.awaitReady(timeoutS = 900)
-        agent.sendPrompt(
-          "Count from 1 to 5000 in your output, one number per line. Do not stop or summarize early.",
-          timeoutS = 900,
-          promptAsFile = false
-        )
-        Thread.sleep(500)
-        assume(agent.isBusy, "agent finished too fast for busy-stop integration test")
-        agent.stop()
-        agent.pane shouldBe empty
-        val server = new TmuxServer(soc)
-        server.hasSession(label) shouldBe false
-    finally
-      if agent.pane.nonEmpty then agent.stop()
   }
 
   test("send prompt as file single followup") {
@@ -234,28 +119,20 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
     val token = UUID.randomUUID().toString.replace("-", "").take(12)
-    val proof = tmp / s"proof_file_mode_$token.txt"
+    val proof = tmp.resolve(s"proof_file_mode_$token.txt")
     val instruction =
       s"""Create a UTF-8 file at exactly this path with content: OK-$token\\n$proof\\nReply DONE when finished."""
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.awaitReady(timeoutS = 900)
-        agent.sendPrompt(instruction, timeoutS = 900, promptAsFile = true)
-        agent.awaitDone(timeoutS = 900)
-        agent.awaitReady(timeoutS = 900)
+        agent.start()
+        agent.awaitIdle(100.seconds)
+        agent.sendPrompt(instruction, promptAsFile = true)
+        agent.awaitIdle(100.seconds)
     finally agent.stop()
 
-    os.isFile(proof) shouldBe true
-    val text = os.read(proof).strip()
+    Files.isRegularFile(proof) shouldBe true
+    val text = Files.readString(proof, StandardCharsets.UTF_8).strip()
     (text.contains(s"OK-$token") || text == s"OK-$token") shouldBe true
   }
 
@@ -263,33 +140,24 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
-    val log = tmp / "chunk_log.txt"
+    val log = tmp.resolve("chunk_log.txt")
     val tokens = (1 to 3).map(_ => UUID.randomUUID().toString.replace("-", "").take(10)).toSeq
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.awaitReady(timeoutS = 900)
+        agent.start()
+        agent.awaitIdle(100.seconds)
         tokens.zipWithIndex.foreach { case (tok, i) =>
           agent.sendPrompt(
             s"Append exactly one line to $log: CHUNK$i $tok\\nThen stop. Reply DONE.",
-            timeoutS = 900,
             promptAsFile = true
           )
-          agent.awaitDone(timeoutS = 900)
-          agent.awaitReady(timeoutS = 900)
+          agent.awaitIdle(100.seconds)
         }
     finally agent.stop()
 
-    os.isFile(log) shouldBe true
-    val body = os.read(log)
+    Files.isRegularFile(log) shouldBe true
+    val body = Files.readString(log, StandardCharsets.UTF_8)
     tokens.zipWithIndex.foreach { case (tok, i) =>
       body should include(s"CHUNK$i")
       body should include(tok)
@@ -304,9 +172,9 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
     val u = UUID.randomUUID().toString.replace("-", "").take(8)
-    val a = tmp / s"long_a_$u.txt"
-    val b = tmp / s"long_b_$u.txt"
-    val c = tmp / s"long_c_$u.txt"
+    val a = tmp.resolve(s"long_a_$u.txt")
+    val b = tmp.resolve(s"long_b_$u.txt")
+    val c = tmp.resolve(s"long_c_$u.txt")
     val filler = (1 until 29).map(n => s"Context line $n — ignore this paragraph.").mkString("\n")
     val instruction =
       s"""Follow every step below. Reply DONE when all files exist.
@@ -322,89 +190,18 @@ $b
 Step 3: Write exactly the text GAMMA-$u (no newline) to file:
 $c
 """
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.awaitReady(timeoutS = 900)
-        agent.sendPrompt(instruction, timeoutS = 900, promptAsFile = true)
-        agent.awaitDone(timeoutS = 900)
+        agent.start()
+        agent.awaitIdle(100.seconds)
+        agent.sendPrompt(instruction, promptAsFile = true)
+        agent.awaitIdle(100.seconds)
     finally agent.stop()
 
-    os.read(a).strip() shouldBe s"ALPHA-$u"
-    os.read(b).strip() shouldBe s"BETA-$u"
-    os.read(c).strip() shouldBe s"GAMMA-$u"
-  }
-
-  test("start with prompt then file followup") {
-    gate()
-    val tmp = tmpWorkspace
-    val (soc, label) = uniqueSessionIds
-    val secret = UUID.randomUUID().toString.replace("-", "").take(12)
-    val round1 = tmp / "round1.txt"
-    val round2 = tmp / "round2.txt"
-    val firstPrompt =
-      s"""Create a UTF-8 file at $round1 with exactly two lines:\\nLINE1:$secret\\nLINE2:IGNORE\\nReply DONE when finished."""
-    val follow =
-      s"""Read the file at $round1. Create $round2 with a single line that is the LINE1 value from round1 repeated twice with no separator (e.g. if LINE1 is abc then write abcabc). Reply DONE."""
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
-    try
-      withTimeout:
-        agent.start(Some(firstPrompt)) shouldBe 0
-        os.isFile(round1) shouldBe true
-        agent.sendPrompt(follow, timeoutS = 900, promptAsFile = true)
-        agent.awaitDone(timeoutS = 900)
-    finally agent.stop()
-
-    os.isFile(round2) shouldBe true
-    os.read(round2).strip() shouldBe secret * 2
-  }
-
-  test("prompt as file temp cleanup on stop") {
-    gate()
-    val tmp = tmpWorkspace
-    val (soc, label) = uniqueSessionIds
-    val log = tmp / "cleanup_log.txt"
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
-    try
-      withTimeout:
-        agent.start(None) shouldBe 0
-        agent.awaitReady(timeoutS = 900)
-        (1 to 2).foreach { _ =>
-          val tok = UUID.randomUUID().toString.replace("-", "").take(8)
-          agent.sendPrompt(
-            s"Append one line to $log: $tok\\nThen stop. Reply DONE.",
-            timeoutS = 900,
-            promptAsFile = true
-          )
-          agent.awaitDone(timeoutS = 900)
-          agent.awaitReady(timeoutS = 900)
-        }
-        globPromptMd(tmp).nonEmpty shouldBe true
-    finally agent.stop()
-
-    globPromptMd(tmp) shouldBe empty
+    Files.readString(a, StandardCharsets.UTF_8).strip() shouldBe s"ALPHA-$u"
+    Files.readString(b, StandardCharsets.UTF_8).strip() shouldBe s"BETA-$u"
+    Files.readString(c, StandardCharsets.UTF_8).strip() shouldBe s"GAMMA-$u"
   }
 
   for (promptAsFile <- Seq(true, false))
@@ -413,74 +210,38 @@ $c
       val tmp = tmpWorkspace
       val (soc, label) = uniqueSessionIds
       val token = UUID.randomUUID().toString.replace("-", "").take(12)
-      val proof = tmp / s"parity_${promptAsFile}_$token.txt"
+      val proof = tmp.resolve(s"parity_${promptAsFile}_$token.txt")
       val instruction =
         s"""Create a UTF-8 file at $proof with content exactly: TOKEN=$token\\nReply DONE when finished."""
-      val agent = new CursorAgent(
-        tmp,
-        model,
-        tmuxSocket = soc,
-        label = label,
-        oneShot = false,
-        config = AgentConfig(quiet = true)
-      )
+      val agent = new CursorAgent(tmp, model, socket = soc, label = label)
       try
         withTimeout:
-          agent.start(None) shouldBe 0
-          agent.awaitReady(timeoutS = 900)
-          agent.sendPrompt(instruction, timeoutS = 900, promptAsFile = promptAsFile)
-          agent.awaitDone(timeoutS = 900)
+          agent.start()
+          agent.awaitIdle(100.seconds)
+          agent.sendPrompt(instruction, promptAsFile = promptAsFile)
+          agent.awaitIdle(100.seconds)
       finally agent.stop()
 
-      os.isFile(proof) shouldBe true
-      os.read(proof) should include(token)
+      Files.isRegularFile(proof) shouldBe true
+      Files.readString(proof, StandardCharsets.UTF_8) should include(token)
     }
-
-  test("quiet suppresses driver prints") {
-    gate()
-    val tmp = tmpWorkspace
-    val (soc, label) = uniqueSessionIds
-    val baos = new ByteArrayOutputStream()
-    val out = new PrintStream(baos, true, "UTF-8")
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = true,
-      config = AgentConfig(quiet = true, out = out)
-    )
-    withTimeout:
-      val rc = agent.start(None)
-      rc shouldBe 0
-    val s = baos.toString("UTF-8")
-    s should not include ("starting agent")
-    s should not include ("attach with")
-  }
 
   test("no source activate after prompt") {
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
-    val proof = tmp / "proof.txt"
+    val proof = tmp.resolve("proof.txt")
     val instruction =
       s"""Create a file at exactly this path with content OK:\\n$proof\\nReply DONE when finished."""
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.pane.nonEmpty shouldBe true
-        agent.awaitReady(timeoutS = 900)
-        agent.sendPrompt(instruction, timeoutS = 900, promptAsFile = true)
-        agent.awaitDone(timeoutS = 900)
-        val lines = agent.pane.get.captureEntireScrollback()
+        agent.start()
+        agent.isStarted shouldBe true
+        agent.awaitIdle(100.seconds)
+        agent.sendPrompt(instruction, promptAsFile = true)
+        agent.awaitIdle(100.seconds)
+        val lines = agent.pane.captureEntireScrollback()
         val dump = TmuxServer.stripAnsi(lines.mkString("\n"))
         val p = Pattern.compile("(?i)source\\s+\\S*activate")
         val m = p.matcher(dump)
@@ -488,16 +249,5 @@ $c
         withClue(s"pane contains venv activate command\n$dump")(hits shouldBe 0)
     finally agent.stop()
   }
-
-  private def globPromptMd(root: os.Path): Seq[os.Path] =
-    val d = root / ".cursor" / "prompts"
-    if os.isDir(d) then
-      os.list(d)
-        .filter { p =>
-          val n = p.last
-          n.startsWith("agents4s-prompt-") && n.endsWith(".md")
-        }
-        .toSeq
-    else Seq.empty
 
 end CursorAgentIntegrationTest

@@ -2,18 +2,19 @@ package agents4s.cursor
 
 import java.util.concurrent.TimeoutException
 
-import scala.collection.mutable
+import agents4s.tmux.{MockPane, TmuxServer}
 
-import agents4s.tmux.{AgentConfig, MockPane, TmuxServer}
-
+import org.scalatest.ParallelTestExecution
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.prop.Tables.Table
 
-class CursorTuiOpsTest extends AnyFunSuite with Matchers with TableDrivenPropertyChecks:
-
-  private val fastCfg = AgentConfig(pollIntervalS = 0.0, sleeper = _ => ())
+class CursorTuiOpsTest
+    extends AnyFunSuite
+    with Matchers
+    with TableDrivenPropertyChecks
+    with ParallelTestExecution:
 
   private val F = CursorTuiOps.FooterMarker
   private val B = CursorTuiOps.BusyMarker
@@ -66,33 +67,33 @@ class CursorTuiOpsTest extends AnyFunSuite with Matchers with TableDrivenPropert
 
   test("R1 awaitReady already ready no sendKeys") {
     val pane = new MockPane(Seq(Seq(F)))
-    CursorTuiOps.awaitReady(pane, timeoutS = 5.0)(using fastCfg)
+    CursorTuiOps.awaitReady(pane, timeoutS = 5.0, pollIntervalMs = 0)
     pane.sendKeysCalls shouldBe empty
   }
 
   test("R2 awaitReady blank then ready") {
     val pane = new MockPane(Seq(Seq("boot"), Seq("..."), Seq(F)))
-    CursorTuiOps.awaitReady(pane, timeoutS = 5.0)(using fastCfg)
+    CursorTuiOps.awaitReady(pane, timeoutS = 5.0, pollIntervalMs = 0)
     pane.sendKeysCalls shouldBe empty
   }
 
   test("R3 awaitReady trust then ready sends a") {
     val pane = new MockPane(Seq(Seq(T), Seq(T), Seq(F)))
-    CursorTuiOps.awaitReady(pane, timeoutS = 5.0)(using fastCfg)
+    CursorTuiOps.awaitReady(pane, timeoutS = 5.0, pollIntervalMs = 0)
     pane.sendKeysCalls.toSeq should contain(("a", false))
   }
 
   test("R4 awaitReady trust many polls then ready") {
     val trustLines = (1 to 8).map(_ => Seq(T)).toSeq
     val pane = new MockPane(trustLines :+ Seq(F))
-    CursorTuiOps.awaitReady(pane, timeoutS = 5.0)(using fastCfg)
+    CursorTuiOps.awaitReady(pane, timeoutS = 5.0, pollIntervalMs = 0)
     pane.sendKeysCalls.toSeq should contain(("a", false))
   }
 
   test("R5 awaitReady never ready timeout") {
     val pane = new MockPane(Seq(Seq("waiting")))
     val e = intercept[TimeoutException] {
-      CursorTuiOps.awaitReady(pane, timeoutS = 0.05)(using fastCfg)
+      CursorTuiOps.awaitReady(pane, timeoutS = 0.05, pollIntervalMs = 0)
     }
     e.getMessage should include("agent did not become ready in time")
   }
@@ -100,70 +101,70 @@ class CursorTuiOpsTest extends AnyFunSuite with Matchers with TableDrivenPropert
   test("R6 handleTrust timeout trust never clears") {
     val pane = new MockPane(Seq(Seq(T)))
     val e = intercept[TimeoutException] {
-      CursorTuiOps.handleTrust(pane, timeoutS = 0.05)(using fastCfg)
+      CursorTuiOps.handleTrust(pane, timeoutS = 0.05, pollIntervalMs = 0)
     }
     e.getMessage should include("trust dialog did not dismiss")
   }
 
   test("H1 handleTrust first snapshot not trust returns after one a") {
     val pane = new MockPane(Seq(Seq(F)))
-    CursorTuiOps.handleTrust(pane, timeoutS = 5.0)(using fastCfg)
+    CursorTuiOps.handleTrust(pane, timeoutS = 5.0, pollIntervalMs = 0)
     pane.sendKeysCalls.toSeq shouldBe Seq(("a", false))
   }
 
   test("H2 handleTrust trust clears immediately after a") {
     val pane = new MockPane(Seq(Seq(T), Seq(F)))
-    CursorTuiOps.handleTrust(pane, timeoutS = 5.0)(using fastCfg)
+    CursorTuiOps.handleTrust(pane, timeoutS = 5.0, pollIntervalMs = 0)
     pane.sendKeysCalls.head shouldBe (("a", false))
   }
 
   test("H3 handleTrust never clears timeout") {
     val pane = new MockPane(Seq(Seq(T)))
     val e = intercept[TimeoutException] {
-      CursorTuiOps.handleTrust(pane, timeoutS = 0.05)(using fastCfg)
+      CursorTuiOps.handleTrust(pane, timeoutS = 0.05, pollIntervalMs = 0)
     }
     e.getMessage should include("trust dialog did not dismiss")
   }
 
   test("B1 awaitBusy already busy") {
     val pane = new MockPane(Seq(Seq(B)))
-    CursorTuiOps.awaitBusy(pane, timeoutS = 5.0)(using fastCfg)
+    CursorTuiOps.awaitBusy(pane, timeoutS = 5.0, pollIntervalMs = 0)
   }
 
   test("B2 awaitReady then busy") {
     val pane = new MockPane(Seq(Seq(F), Seq(F), Seq(s"$F\n$B")))
-    CursorTuiOps.awaitBusy(pane, timeoutS = 5.0)(using fastCfg)
+    CursorTuiOps.awaitBusy(pane, timeoutS = 5.0, pollIntervalMs = 0)
   }
 
   test("B3 awaitBusy never busy timeout") {
     val pane = new MockPane(Seq(Seq(F)))
     val e = intercept[TimeoutException] {
-      CursorTuiOps.awaitBusy(pane, timeoutS = 0.05)(using fastCfg)
+      CursorTuiOps.awaitBusy(pane, timeoutS = 0.05, pollIntervalMs = 0)
     }
     e.getMessage should include("agent never started working")
   }
 
   test("D1 awaitDone not busy first poll returns immediately") {
     val pane = new MockPane(Seq(Seq(F)))
-    CursorTuiOps.awaitDone(pane, timeoutS = 5.0)(using fastCfg)
+    CursorTuiOps.awaitDone(pane, timeoutS = 5.0, pollIntervalMs = 0)
   }
 
   test("D2 awaitDone busy then idle") {
     val pane = new MockPane(Seq(Seq(s"$F\n$B"), Seq(s"$F\n$B"), Seq(F)))
-    CursorTuiOps.awaitDone(pane, timeoutS = 5.0)(using fastCfg)
+    CursorTuiOps.awaitDone(pane, timeoutS = 5.0, pollIntervalMs = 0)
   }
 
   test("D3 awaitDone stays busy timeout") {
     val pane = new MockPane(Seq(Seq(s"$F\n$B")))
     val e = intercept[TimeoutException] {
-      CursorTuiOps.awaitDone(pane, timeoutS = 0.05)(using fastCfg)
+      CursorTuiOps.awaitDone(pane, timeoutS = 0.05, pollIntervalMs = 0)
     }
     e.getMessage should include("agent work exceeded")
   }
 
   test("tailText joins and strips ansi") {
     val pane = new MockPane(Seq(Seq("\u001b[31mx\u001b[0m", F)))
-    val text = CursorTuiOps.tailText(pane, nLines = 10)(using fastCfg)
+    val text = CursorTuiOps.tailText(pane, nLines = 10)
     text should not include ("\u001b")
     text should include(F)
   }
@@ -172,31 +173,28 @@ class CursorTuiOpsTest extends AnyFunSuite with Matchers with TableDrivenPropert
     "default timeout and nLines accessors: awaitReady awaitBusy awaitDone handleTrust tailText"
   ) {
     val r = new MockPane(Seq(Seq(F)))
-    CursorTuiOps.awaitReady(r)(using fastCfg)
+    CursorTuiOps.awaitReady(r, pollIntervalMs = 0)
     val b = new MockPane(Seq(Seq(B)))
-    CursorTuiOps.awaitBusy(b)(using fastCfg)
+    CursorTuiOps.awaitBusy(b, pollIntervalMs = 0)
     val d = new MockPane(Seq(Seq(F)))
-    CursorTuiOps.awaitDone(d)(using fastCfg)
+    CursorTuiOps.awaitDone(d, pollIntervalMs = 0)
     val h = new MockPane(Seq(Seq(F)))
-    CursorTuiOps.handleTrust(h)(using fastCfg)
+    CursorTuiOps.handleTrust(h, pollIntervalMs = 0)
     val t = new MockPane(Seq(Seq("x", F)))
-    CursorTuiOps.tailText(t)(using fastCfg) should include(F)
+    CursorTuiOps.tailText(t, nLines = 10) should include(F)
   }
 
-  test("AgentConfig sleeper used when polling awaitReady") {
-    var now = 0L
-    val sleeps = mutable.ArrayBuffer[Double]()
-    val cfg = AgentConfig(
-      pollIntervalS = 1.0,
-      sleeper = { d =>
-        sleeps += d
-        now += (d * 1e9).toLong
-      },
-      clockNanos = () => now
-    )
-    val pane = new MockPane(Seq(Seq("boot"), Seq(F)))
-    CursorTuiOps.awaitReady(pane, timeoutS = 10.0)(using cfg)
-    sleeps should not be empty
+  test("awaitReady polls when pollIntervalMs is positive") {
+    var polls = 0
+    val pane = new MockPane(Seq(Seq("boot"), Seq("boot"), Seq(F))):
+      override def capturePane(start: Int = -10): Seq[String] =
+        polls += 1
+        super.capturePane(start)
+    val t0 = System.nanoTime()
+    CursorTuiOps.awaitReady(pane, timeoutS = 5.0, pollIntervalMs = 15)
+    val elapsedMs = (System.nanoTime() - t0) / 1_000_000
+    polls should be >= 2
+    elapsedMs should be >= 10L
   }
 
 end CursorTuiOpsTest
