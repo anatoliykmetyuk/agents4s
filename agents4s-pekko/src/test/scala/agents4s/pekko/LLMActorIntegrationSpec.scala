@@ -10,6 +10,7 @@ import agents4s.cursor.CursorAgent
 import agents4s.tmux.Paths
 
 import org.scalatest.Assertions.{assume, fail}
+import org.scalatest.ParallelTestExecution
 import org.scalatest.concurrent.TimeLimits
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -20,7 +21,11 @@ import upickle.default.*
 import upickle.jsonschema.*
 
 /** Live Cursor `agent` + tmux; run with `scripts/test.sh -i` (see [[gate]]). */
-class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
+class LLMActorIntegrationSpec
+    extends AnyFunSuite
+    with Matchers
+    with TimeLimits
+    with ParallelTestExecution:
 
   private val model: String =
     sys.env.getOrElse("CURSOR_DRIVER_MODEL", "composer-2-fast")

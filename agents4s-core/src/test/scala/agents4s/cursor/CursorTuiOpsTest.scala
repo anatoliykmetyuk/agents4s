@@ -4,12 +4,17 @@ import java.util.concurrent.TimeoutException
 
 import agents4s.tmux.{MockPane, TmuxServer}
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.prop.Tables.Table
 
-class CursorTuiOpsTest extends AnyFunSuite with Matchers with TableDrivenPropertyChecks:
+class CursorTuiOpsTest
+    extends AnyFunSuite
+    with Matchers
+    with TableDrivenPropertyChecks
+    with ParallelTestExecution:
 
   private val F = CursorTuiOps.FooterMarker
   private val B = CursorTuiOps.BusyMarker

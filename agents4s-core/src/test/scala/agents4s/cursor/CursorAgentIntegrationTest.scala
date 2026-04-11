@@ -10,13 +10,18 @@ import scala.concurrent.duration.*
 import agents4s.tmux.{Paths, TmuxServer}
 
 import org.scalatest.Assertions.{assume, withClue}
+import org.scalatest.ParallelTestExecution
 import org.scalatest.concurrent.TimeLimits
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar.*
 
-class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimits:
+class CursorAgentIntegrationTest
+    extends AnyFunSuite
+    with Matchers
+    with TimeLimits
+    with ParallelTestExecution:
 
   private val model: String =
     sys.env.getOrElse("CURSOR_DRIVER_MODEL", "composer-2-fast")
