@@ -4,6 +4,8 @@ import java.io.OutputStream
 import java.io.PrintStream
 import java.nio.file.Files
 
+import scala.concurrent.duration.DurationInt
+
 import agents4s.tmux.{AgentConfig, MockPane, Paths, RecordingTmuxServer, Pane}
 
 import org.scalatest.funsuite.AnyFunSuite
@@ -53,13 +55,13 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
   test("requirePane methods before start raise") {
     val tmp = tmpWorkspace
     val agent = unitAgent(tmp, oneShot = true)
-    intercept[RuntimeException](agent.isReady).getMessage should include("not started")
+    agent.isIdle shouldBe false
     intercept[RuntimeException](agent.isBusy).getMessage should include("not started")
     intercept[RuntimeException](agent.isTrustPrompt).getMessage should include("not started")
-    intercept[RuntimeException](agent.awaitReady(timeoutS = 1.0)).getMessage should include(
+    intercept[RuntimeException](agent.awaitIdle(1.second)).getMessage should include("not started")
+    intercept[RuntimeException](agent.sendPrompt("hi", promptAsFile = false)).getMessage should include(
       "not started"
     )
-    intercept[RuntimeException](agent.sendPrompt("hi")).getMessage should include("not started")
     agent.stop()
   }
 
@@ -74,7 +76,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
     agent.pane shouldBe empty
   }
 
-  test("start returns 127 when agent not on path") {
+  test("start throws when agent not on path") {
     val tmp = tmpWorkspace
     val agent = new CursorAgent(
       tmp,
@@ -86,7 +88,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
         killRemoteOnStop = false
       )
     )
-    agent.start() shouldBe 127
+    intercept[RuntimeException](agent.start(null)).getMessage should include("not found on PATH")
     agent.pane shouldBe empty
   }
 
@@ -100,7 +102,8 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       oneShot = false,
       config = AgentConfig(quiet = true, killRemoteOnStop = false)
     )
-    agent.workspace shouldBe tmp
+    agent.workspace shouldBe tmp.toNIO
+    agent.workspacePath shouldBe tmp
     agent.model shouldBe "composer-2"
     agent.tmuxSocket shouldBe "s"
     agent.label shouldBe "l"
@@ -177,7 +180,8 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
   test("minimal constructor exposes default public settings") {
     val tmp = tmpWorkspace
     val agent = new CursorAgent(tmp, "composer-2")
-    agent.workspace shouldBe tmp
+    agent.workspace shouldBe tmp.toNIO
+    agent.workspacePath shouldBe tmp
     agent.model shouldBe "composer-2"
     agent.tmuxSocket shouldBe "cursor-agent"
     agent.label shouldBe "agent"
@@ -185,28 +189,28 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
     agent.oneShot shouldBe true
   }
 
-  test("awaitReady and awaitDone use default timeout when pane settles immediately") {
+  test("awaitIdle uses trust-aware wait when pane settles immediately") {
     val tmp = tmpWorkspace
     val agent = unitAgent(tmp)
     val donePane = new MockPane(Seq(Seq(F)))
     agent.pane = Some(donePane)
-    agent.awaitDone()
+    agent.awaitIdle(5.seconds)
     val readyPane = new MockPane(Seq(Seq(F)))
     agent.pane = Some(readyPane)
-    agent.awaitReady()
+    agent.awaitIdle(5.seconds)
   }
 
-  test("isTrustPrompt isReady isBusy use tail with multiline pane") {
+  test("isTrustPrompt isIdle isBusy use tail with multiline pane") {
     val tmp = tmpWorkspace
     val agent = unitAgent(tmp)
     val trustTail = (Seq.fill(19)("pad") :+ T).toSeq
     agent.pane = Some(new MockPane(Seq(trustTail)))
     agent.isTrustPrompt shouldBe true
-    agent.isReady shouldBe false
+    agent.isIdle shouldBe false
 
     val readyTail = (Seq.fill(19)("pad") :+ F).toSeq
     agent.pane = Some(new MockPane(Seq(readyTail)))
-    agent.isReady shouldBe true
+    agent.isIdle shouldBe true
     agent.isTrustPrompt shouldBe false
     agent.isBusy shouldBe false
 
@@ -305,7 +309,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
     val readyTail = (Seq.fill(19)("pad") :+ F).toSeq
     val pane = new MockPane(Seq(busyTail, readyTail))
     agent.pane = Some(pane)
-    agent.stop(interruptAttempts = 10)
+    agent.stop()
     pane.sendInterruptCount should be > 0
     rec.killSessionNames.toList shouldBe List("lab")
     agent.pane shouldBe empty
@@ -314,7 +318,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
   test("stop on alive busy agent exhausts interrupt attempts then tears down") {
     val tmp = tmpWorkspace
     val rec = new RecordingTmuxServer("sock")
-    val max = 4
+    val max = 10
     val agent = new CursorAgent(
       tmp,
       "composer-2",
@@ -332,7 +336,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
     val busyTail = (Seq.fill(19)("pad") :+ B).toSeq
     val pane = new MockPane(Seq(busyTail))
     agent.pane = Some(pane)
-    agent.stop(interruptAttempts = max)
+    agent.stop()
     pane.sendInterruptCount shouldBe max
     rec.killSessionNames.toList shouldBe List("lab")
     agent.pane shouldBe empty
@@ -367,7 +371,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
     agent.pane shouldBe empty
   }
 
-  test("start without prompt uses newPane and returns 0") {
+  test("start without prompt uses newPane") {
     val tmp = tmpWorkspace
     val rec = new RecordingTmuxServer("soc")
     val agent = new CursorAgent(
@@ -388,7 +392,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
         err = new PrintStream(OutputStream.nullOutputStream())
       )
     )
-    agent.start(None) shouldBe 0
+    agent.start(null)
     agent.pane.nonEmpty shouldBe true
     rec.killSessionNames shouldBe empty
   }
@@ -414,7 +418,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
         err = new PrintStream(OutputStream.nullOutputStream())
       )
     )
-    agent.start(None) shouldBe 0
+    agent.start(null)
     rec.killSessionNames should contain("lab")
     agent.pane shouldBe empty
   }
@@ -448,7 +452,7 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
       )
     )
     globPrompts(tmp) shouldBe empty
-    agent.start(Some("prompt-body")) shouldBe 0
+    agent.start("prompt-body")
     globPrompts(tmp) shouldBe empty
     agent.promptPaths shouldBe empty
   }

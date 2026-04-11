@@ -38,7 +38,7 @@ Output in the precise format specified above.
       outputInstructions: String
   ): Behavior[HeartbeatTick.type] =
     Behaviors.withTimers: timers =>
-      agent.start(Some(inputPrompt))
+      agent.start(inputPrompt)
       timers.startTimerWithFixedDelay(HeartbeatTimerKey, HeartbeatTick, 1.second)
       awaitDone[O](replyTo, agent, outputInstructions)
 

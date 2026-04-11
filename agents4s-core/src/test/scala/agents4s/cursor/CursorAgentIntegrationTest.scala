@@ -6,6 +6,8 @@ import java.nio.file.Files
 import java.util.UUID
 import java.util.regex.Pattern
 
+import scala.concurrent.duration.*
+
 import agents4s.tmux.{AgentConfig, Paths, TmuxServer}
 
 import org.scalatest.Assertions.{assume, withClue}
@@ -52,10 +54,10 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     )
     try
       withTimeout:
-        agent.start(None) shouldBe 0
+        agent.start(null)
         agent.pane.nonEmpty shouldBe true
-        agent.awaitReady(timeoutS = 900)
-        agent.isReady shouldBe true
+        agent.awaitIdle(900.seconds)
+        agent.isIdle shouldBe true
         agent.isTrustPrompt shouldBe false
     finally agent.stop()
   }
@@ -74,11 +76,11 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     )
     try
       withTimeout:
-        agent.start(None) shouldBe 0
+        agent.start(null)
         agent.pane.nonEmpty shouldBe true
         val _ = agent.isTrustPrompt
-        agent.awaitReady(timeoutS = 900)
-        agent.isReady shouldBe true
+        agent.awaitIdle(900.seconds)
+        agent.isIdle shouldBe true
     finally agent.stop()
   }
 
@@ -98,8 +100,7 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       config = AgentConfig(quiet = true)
     )
     withTimeout:
-      val rc = agent.start(Some(instruction))
-      rc shouldBe 0
+      agent.start(instruction)
       if os.isFile(proof) then
         val text = os.read(proof).strip()
         (text.contains("OK") || text == "OK") shouldBe true
@@ -121,18 +122,17 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       )
       try
         withTimeout:
-          agent.start(None) shouldBe 0
-          agent.awaitReady(timeoutS = 900)
+          agent.start(null)
+          agent.awaitIdle(900.seconds)
           for (t <- 0 until turns)
-            agent.isReady shouldBe true
+            agent.isIdle shouldBe true
             val token = UUID.randomUUID().toString.replace("-", "").take(8)
             agent.sendPrompt(
               s"Append exactly one line to $log: TURN $t $token\\nThen stop. Reply DONE.",
-              timeoutS = 900
+              promptAsFile = true
             )
-            agent.awaitDone(timeoutS = 900)
-            agent.awaitReady(timeoutS = 900)
-            agent.isReady shouldBe true
+            agent.awaitIdle(900.seconds)
+            agent.isIdle shouldBe true
             if os.isFile(log) then
               val content = os.read(log)
               content should include(token)
@@ -152,7 +152,7 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       config = AgentConfig(quiet = true)
     )
     withTimeout:
-      agent.start(None) shouldBe 0
+      agent.start(null)
       val server = new TmuxServer(soc)
       server.hasSession(label) shouldBe false
   }
@@ -171,7 +171,7 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     )
     try
       withTimeout:
-        agent.start(None) shouldBe 0
+        agent.start(null)
         val server = new TmuxServer(soc)
         server.hasSession(label) shouldBe true
     finally agent.stop()
@@ -190,7 +190,7 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       config = AgentConfig(quiet = true)
     )
     withTimeout:
-      agent.start(None) shouldBe 0
+      agent.start(null)
       agent.pane.nonEmpty shouldBe true
       agent.stop()
       agent.pane shouldBe empty
@@ -212,11 +212,10 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     )
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.awaitReady(timeoutS = 900)
+        agent.start(null)
+        agent.awaitIdle(900.seconds)
         agent.sendPrompt(
           "Count from 1 to 5000 in your output, one number per line. Do not stop or summarize early.",
-          timeoutS = 900,
           promptAsFile = false
         )
         Thread.sleep(500)
@@ -247,11 +246,10 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     )
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.awaitReady(timeoutS = 900)
-        agent.sendPrompt(instruction, timeoutS = 900, promptAsFile = true)
-        agent.awaitDone(timeoutS = 900)
-        agent.awaitReady(timeoutS = 900)
+        agent.start(null)
+        agent.awaitIdle(900.seconds)
+        agent.sendPrompt(instruction, promptAsFile = true)
+        agent.awaitIdle(900.seconds)
     finally agent.stop()
 
     os.isFile(proof) shouldBe true
@@ -275,16 +273,14 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
     )
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.awaitReady(timeoutS = 900)
+        agent.start(null)
+        agent.awaitIdle(900.seconds)
         tokens.zipWithIndex.foreach { case (tok, i) =>
           agent.sendPrompt(
             s"Append exactly one line to $log: CHUNK$i $tok\\nThen stop. Reply DONE.",
-            timeoutS = 900,
             promptAsFile = true
           )
-          agent.awaitDone(timeoutS = 900)
-          agent.awaitReady(timeoutS = 900)
+          agent.awaitIdle(900.seconds)
         }
     finally agent.stop()
 
@@ -332,10 +328,10 @@ $c
     )
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.awaitReady(timeoutS = 900)
-        agent.sendPrompt(instruction, timeoutS = 900, promptAsFile = true)
-        agent.awaitDone(timeoutS = 900)
+        agent.start(null)
+        agent.awaitIdle(900.seconds)
+        agent.sendPrompt(instruction, promptAsFile = true)
+        agent.awaitIdle(900.seconds)
     finally agent.stop()
 
     os.read(a).strip() shouldBe s"ALPHA-$u"
@@ -364,10 +360,11 @@ $c
     )
     try
       withTimeout:
-        agent.start(Some(firstPrompt)) shouldBe 0
+        agent.start(firstPrompt)
         os.isFile(round1) shouldBe true
-        agent.sendPrompt(follow, timeoutS = 900, promptAsFile = true)
-        agent.awaitDone(timeoutS = 900)
+        agent.awaitIdle(900.seconds)
+        agent.sendPrompt(follow, promptAsFile = true)
+        agent.awaitIdle(900.seconds)
     finally agent.stop()
 
     os.isFile(round2) shouldBe true
@@ -389,17 +386,15 @@ $c
     )
     try
       withTimeout:
-        agent.start(None) shouldBe 0
-        agent.awaitReady(timeoutS = 900)
+        agent.start(null)
+        agent.awaitIdle(900.seconds)
         (1 to 2).foreach { _ =>
           val tok = UUID.randomUUID().toString.replace("-", "").take(8)
           agent.sendPrompt(
             s"Append one line to $log: $tok\\nThen stop. Reply DONE.",
-            timeoutS = 900,
             promptAsFile = true
           )
-          agent.awaitDone(timeoutS = 900)
-          agent.awaitReady(timeoutS = 900)
+          agent.awaitIdle(900.seconds)
         }
         globPromptMd(tmp).nonEmpty shouldBe true
     finally agent.stop()
@@ -426,10 +421,10 @@ $c
       )
       try
         withTimeout:
-          agent.start(None) shouldBe 0
-          agent.awaitReady(timeoutS = 900)
-          agent.sendPrompt(instruction, timeoutS = 900, promptAsFile = promptAsFile)
-          agent.awaitDone(timeoutS = 900)
+          agent.start(null)
+          agent.awaitIdle(900.seconds)
+          agent.sendPrompt(instruction, promptAsFile = promptAsFile)
+          agent.awaitIdle(900.seconds)
       finally agent.stop()
 
       os.isFile(proof) shouldBe true
@@ -451,8 +446,7 @@ $c
       config = AgentConfig(quiet = true, out = out)
     )
     withTimeout:
-      val rc = agent.start(None)
-      rc shouldBe 0
+      agent.start(null)
     val s = baos.toString("UTF-8")
     s should not include ("starting agent")
     s should not include ("attach with")
@@ -475,11 +469,11 @@ $c
     )
     try
       withTimeout:
-        agent.start(None) shouldBe 0
+        agent.start(null)
         agent.pane.nonEmpty shouldBe true
-        agent.awaitReady(timeoutS = 900)
-        agent.sendPrompt(instruction, timeoutS = 900, promptAsFile = true)
-        agent.awaitDone(timeoutS = 900)
+        agent.awaitIdle(900.seconds)
+        agent.sendPrompt(instruction, promptAsFile = true)
+        agent.awaitIdle(900.seconds)
         val lines = agent.pane.get.captureEntireScrollback()
         val dump = TmuxServer.stripAnsi(lines.mkString("\n"))
         val p = Pattern.compile("(?i)source\\s+\\S*activate")

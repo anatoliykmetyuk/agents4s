@@ -52,7 +52,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("happy path: immediate idle, valid JSON") {
     val ws = tmpWorkspace
     val stub = new StubAgent(
-      ws,
+      ws.toNIO,
       busyPhases = List(0, 0),
       onSendPrompt = p =>
         val path = extractJsonFilePath(p)
@@ -74,7 +74,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("happy path: busy ticks before result prompt, then busy before read") {
     val ws = tmpWorkspace
     val stub = new StubAgent(
-      ws,
+      ws.toNIO,
       busyPhases = List(2, 1),
       onSendPrompt = p =>
         val path = extractJsonFilePath(p)
@@ -96,7 +96,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("complex nested output type") {
     val ws = tmpWorkspace
     val stub = new StubAgent(
-      ws,
+      ws.toNIO,
       busyPhases = List(0, 0),
       onSendPrompt = p =>
         val path = extractJsonFilePath(p)
@@ -119,7 +119,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     val ws = tmpWorkspace
     var attempt = 0
     val stub = new StubAgent(
-      ws,
+      ws.toNIO,
       busyPhases = List(0, 0, 0),
       onSendPrompt = p =>
         attempt += 1
@@ -144,7 +144,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("failure: invalid JSON on all three read attempts") {
     val ws = tmpWorkspace
     val stub = new StubAgent(
-      ws,
+      ws.toNIO,
       busyPhases = List(0, 0, 0, 0),
       onSendPrompt = p =>
         val path = extractJsonFilePath(p)
@@ -170,7 +170,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     val ws = tmpWorkspace
     var n = 0
     val stub = new StubAgent(
-      ws,
+      ws.toNIO,
       busyPhases = List(0, 0, 0),
       onSendPrompt = p =>
         n += 1
@@ -195,7 +195,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     val ws = tmpWorkspace
     val outInstr = "OUTPUT_INSTR_UNIQUE"
     val stub = new StubAgent(
-      ws,
+      ws.toNIO,
       busyPhases = List(0, 0),
       onSendPrompt = p =>
         val path = extractJsonFilePath(p)
@@ -225,7 +225,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("large payload round-trip") {
     val ws = tmpWorkspace
     val stub = new StubAgent(
-      ws,
+      ws.toNIO,
       busyPhases = List(0, 0),
       onSendPrompt = p =>
         val path = extractJsonFilePath(p)

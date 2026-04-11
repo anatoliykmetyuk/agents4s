@@ -6,8 +6,8 @@ import java.util.concurrent.TimeoutException
 /**
  * Universal agent interface (tmux-based or otherwise).
  *
- * Typical flow: `start`, then `sendPrompt` as needed; poll `isReady` / `isBusy` or use
- * `awaitReady` / `awaitBusy` / `awaitDone`; finish with `stop`.
+ * Typical flow: `start`, then `sendPrompt` as needed; poll `isIdle` / `isBusy` or use
+ * `awaitStarted` / `awaitBusy` / `awaitIdle`; finish with `stop`.
  */
 trait Agent:
 

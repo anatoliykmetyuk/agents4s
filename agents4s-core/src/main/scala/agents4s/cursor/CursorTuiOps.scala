@@ -1,12 +1,14 @@
 package agents4s.cursor
 
-import agents4s.Agent
 import agents4s.tmux.{AgentConfig, Pane, TmuxServer}
 
 import java.util.concurrent.TimeoutException
 
 /** Cursor `agent` CLI TUI markers and lifecycle helpers. */
 object CursorTuiOps:
+
+  /** Default maximum wait for readiness / work completion (seconds). */
+  val DefaultTimeoutS: Double = 30 * 60
 
   val FooterMarker: String = "Auto-run"
   val BusyMarker: String = "ctrl+c to stop"
@@ -27,7 +29,7 @@ object CursorTuiOps:
   def isBusy(text: String): Boolean =
     text.contains(BusyMarker)
 
-  def handleTrust(pane: Pane, timeoutS: Double = Agent.DefaultTimeoutS)(using
+  def handleTrust(pane: Pane, timeoutS: Double = DefaultTimeoutS)(using
       cfg: AgentConfig
   ): Unit =
     pane.sendKeys("a", enter = false)
@@ -37,7 +39,7 @@ object CursorTuiOps:
       cfg.sleeper(cfg.pollIntervalS)
     throw new TimeoutException("trust dialog did not dismiss")
 
-  def awaitReady(pane: Pane, timeoutS: Double = Agent.DefaultTimeoutS)(using
+  def awaitReady(pane: Pane, timeoutS: Double = DefaultTimeoutS)(using
       cfg: AgentConfig
   ): Unit =
     val deadline = cfg.clockNanos() + (timeoutS * 1e9).toLong
@@ -50,7 +52,7 @@ object CursorTuiOps:
       else cfg.sleeper(cfg.pollIntervalS)
     throw new TimeoutException("agent did not become ready in time")
 
-  def awaitBusy(pane: Pane, timeoutS: Double = Agent.DefaultTimeoutS)(using
+  def awaitBusy(pane: Pane, timeoutS: Double = DefaultTimeoutS)(using
       cfg: AgentConfig
   ): Unit =
     val deadline = cfg.clockNanos() + (timeoutS * 1e9).toLong
@@ -59,7 +61,7 @@ object CursorTuiOps:
       cfg.sleeper(cfg.pollIntervalS)
     throw new TimeoutException("agent never started working")
 
-  def awaitDone(pane: Pane, timeoutS: Double = Agent.DefaultTimeoutS)(using
+  def awaitDone(pane: Pane, timeoutS: Double = DefaultTimeoutS)(using
       cfg: AgentConfig
   ): Unit =
     val deadline = cfg.clockNanos() + (timeoutS * 1e9).toLong
