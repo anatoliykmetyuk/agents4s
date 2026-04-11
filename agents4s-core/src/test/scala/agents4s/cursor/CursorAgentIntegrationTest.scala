@@ -39,12 +39,6 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
   private def withTimeout[T](body: => T): T =
     failAfter(Span(900, org.scalatest.time.Seconds))(body)
 
-  /** `sendPrompt` is non-blocking; wait for the busy marker, then for idle, so the TUI is not stale. */
-  private def sendAndComplete(agent: CursorAgent, text: String, promptAsFile: Boolean): Unit =
-    agent.sendPrompt(text, promptAsFile)
-    agent.awaitBusy(900.seconds)
-    agent.awaitIdle(900.seconds)
-
   test("I1 cold start await ready") {
     gate()
     val tmp = tmpWorkspace
@@ -89,11 +83,11 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
           for (t <- 0 until turns)
             agent.isIdle shouldBe true
             val token = UUID.randomUUID().toString.replace("-", "").take(8)
-            sendAndComplete(
-              agent,
+            agent.sendPrompt(
               s"Append exactly one line to $log: TURN $t $token\\nThen stop. Reply DONE.",
               promptAsFile = true
             )
+            agent.awaitIdle(900.seconds)
             agent.isIdle shouldBe true
             if Files.isRegularFile(log) then
               val content = Files.readString(log, StandardCharsets.UTF_8)
@@ -128,7 +122,8 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
       withTimeout:
         agent.start()
         agent.awaitIdle(900.seconds)
-        sendAndComplete(agent, instruction, promptAsFile = true)
+        agent.sendPrompt(instruction, promptAsFile = true)
+        agent.awaitIdle(900.seconds)
     finally agent.stop()
 
     Files.isRegularFile(proof) shouldBe true
@@ -148,11 +143,11 @@ class CursorAgentIntegrationTest extends AnyFunSuite with Matchers with TimeLimi
         agent.start()
         agent.awaitIdle(900.seconds)
         tokens.zipWithIndex.foreach { case (tok, i) =>
-          sendAndComplete(
-            agent,
+          agent.sendPrompt(
             s"Append exactly one line to $log: CHUNK$i $tok\\nThen stop. Reply DONE.",
             promptAsFile = true
           )
+          agent.awaitIdle(900.seconds)
         }
     finally agent.stop()
 
@@ -195,7 +190,8 @@ $c
       withTimeout:
         agent.start()
         agent.awaitIdle(900.seconds)
-        sendAndComplete(agent, instruction, promptAsFile = true)
+        agent.sendPrompt(instruction, promptAsFile = true)
+        agent.awaitIdle(900.seconds)
     finally agent.stop()
 
     Files.readString(a, StandardCharsets.UTF_8).strip() shouldBe s"ALPHA-$u"
@@ -217,7 +213,8 @@ $c
         withTimeout:
           agent.start()
           agent.awaitIdle(900.seconds)
-          sendAndComplete(agent, instruction, promptAsFile = promptAsFile)
+          agent.sendPrompt(instruction, promptAsFile = promptAsFile)
+          agent.awaitIdle(900.seconds)
       finally agent.stop()
 
       Files.isRegularFile(proof) shouldBe true
@@ -237,7 +234,8 @@ $c
         agent.start()
         agent.isStarted shouldBe true
         agent.awaitIdle(900.seconds)
-        sendAndComplete(agent, instruction, promptAsFile = true)
+        agent.sendPrompt(instruction, promptAsFile = true)
+        agent.awaitIdle(900.seconds)
         val lines = agent.pane.captureEntireScrollback()
         val dump = TmuxServer.stripAnsi(lines.mkString("\n"))
         val p = Pattern.compile("(?i)source\\s+\\S*activate")

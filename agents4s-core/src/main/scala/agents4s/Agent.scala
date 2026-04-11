@@ -1,6 +1,6 @@
 package agents4s
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.*
 import java.util.concurrent.TimeoutException
 
 /** Universal agent interface (tmux-based or otherwise).
@@ -25,11 +25,16 @@ trait Agent:
     */
   def start(): Unit
 
+  /** Starts the session and submits the first task prompt (e.g. [[agents4s.pekko.LLMActor]]).
+    */
+  def start(initialPrompt: String): Unit
+
   /** Tears down the session.
     */
   def stop(): Unit
 
-  /** Submits user prompt to the agent. This method is non-blocking and returns immediately.
+  /** Submits user prompt to the agent. Implementations may block until the agent acknowledges
+    * submission (e.g. tmux drivers may wait until the TUI shows a busy state).
     *
     * @throws RuntimeException
     *   if the agent is busy or not started
@@ -56,21 +61,39 @@ trait Agent:
     */
   def isIdle: Boolean = isStarted && !isBusy
 
-  def awaitStarted(timeout: Duration): Unit = await(_ => isStarted, timeout)
-  def awaitBusy(timeout: Duration): Unit = await(_ => isBusy, timeout)
-  def awaitIdle(timeout: Duration): Unit = await(_ => isIdle, timeout)
+  def awaitStarted(
+      timeout: Duration,
+      pollInterval: Duration = 1.second
+  ): Unit = await(_ => isStarted, timeout, pollInterval)
+
+  def awaitBusy(
+      timeout: Duration,
+      pollInterval: Duration = 1.second
+  ): Unit = await(_ => isBusy, timeout, pollInterval)
+
+  def awaitIdle(
+      timeout: Duration,
+      pollInterval: Duration = 1.second
+  ): Unit = await(_ => isIdle, timeout, pollInterval)
 
   /** Blocks until the predicate is true or the timeout elapses.
     *
     * @param predicate
     *   the predicate to wait for
     * @param timeout
-    *   maximum time to wait for the predicate to become true, in seconds
+    *   maximum time to wait for the predicate to become true
+    * @param pollInterval
+    *   delay between predicate checks
     * @throws TimeoutException
     *   if the predicate does not become true within the timeout
     */
-  def await(predicate: Agent => Boolean, timeout: Duration): Unit =
+  def await(
+      predicate: Agent => Boolean,
+      timeout: Duration,
+      pollInterval: Duration = 1.second
+  ): Unit =
     val deadline = System.nanoTime() + timeout.toNanos.toLong
-    while !predicate(this) && System.nanoTime() < deadline do Thread.sleep(1000)
+    val sleepMs = pollInterval.toMillis.max(1L)
+    while !predicate(this) && System.nanoTime() < deadline do Thread.sleep(sleepMs)
     if !predicate(this) then
       throw TimeoutException(s"predicate did not become true within ${timeout.toSeconds} seconds")

@@ -127,7 +127,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     var attempt = 0
     val stub = new StubAgent(
       ws,
-      busyPhases = List(0, 0, 0, 0),
+      busyPhases = List(0, 0, 0),
       onSendPrompt = p =>
         whenJsonResult(p): path =>
           attempt += 1
@@ -144,7 +144,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
       )
     )
     probe.expectMessage(45.seconds, TestResult("fixed"))
-    stub.recordedSendPrompts should have size 3
+    stub.recordedSendPrompts should have size 2
     probe.expectTerminated(child, 5.seconds)
   }
 
@@ -152,7 +152,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     val ws = tmpWorkspace
     val stub = new StubAgent(
       ws,
-      busyPhases = List(0, 0, 0, 0, 0),
+      busyPhases = List(0, 0, 0, 0),
       onSendPrompt = p =>
         whenJsonResult(p): path =>
           Files.writeString(path, "%%%", StandardCharsets.UTF_8)
@@ -169,8 +169,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     probe.receiveMessage(45.seconds) match
       case LLMActor.LLMError(e) => e shouldBe a[Exception]
       case other                => fail(s"expected LLMError, got $other")
-    // task prompt + three JSON result retries
-    stub.recordedSendPrompts should have size 4
+    stub.recordedSendPrompts should have size 3
     probe.expectTerminated(child, 5.seconds)
   }
 
@@ -179,7 +178,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     var n = 0
     val stub = new StubAgent(
       ws,
-      busyPhases = List(0, 0, 0, 0),
+      busyPhases = List(0, 0, 0),
       onSendPrompt = p =>
         whenJsonResult(p): path =>
           n += 1
@@ -202,19 +201,15 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("structural: start and sendPrompt carry expected content") {
     val ws = tmpWorkspace
     val outInstr = "OUTPUT_INSTR_UNIQUE"
-    var sendIdx = 0
     val stub = new StubAgent(
       ws,
       busyPhases = List(0, 0),
       onSendPrompt = p =>
-        sendIdx += 1
-        if sendIdx == 1 then p should include("INPUT_BODY_UNIQUE")
-        else
-          val path = extractJsonFilePath(p)
-          p should include(outInstr)
-          p should include(path.toString)
-          p should include("value") // field name from TestResult schema
-          Files.writeString(path, """{"value":"v"}""", StandardCharsets.UTF_8)
+        val path = extractJsonFilePath(p)
+        p should include(outInstr)
+        p should include(path.toString)
+        p should include("value") // field name from TestResult schema
+        Files.writeString(path, """{"value":"v"}""", StandardCharsets.UTF_8)
     )
     val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
     val child = testKit.spawn(
@@ -226,9 +221,8 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
       )
     )
     probe.expectMessage(30.seconds, TestResult("v"))
-    stub.recordedStartCalls shouldBe 1
-    stub.recordedSendPrompts.head should include("INPUT_BODY_UNIQUE")
-    val p = stub.recordedSendPrompts(1)
+    stub.recordedStarts shouldBe Seq(Some("INPUT_BODY_UNIQUE"))
+    val p = stub.recordedSendPrompts.head
     p should include("Write the result of your operation to JSON file")
     p should include("following schema")
     p should include(outInstr)

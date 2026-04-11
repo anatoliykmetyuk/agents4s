@@ -12,21 +12,31 @@ final class StubAgent(
     onSendPrompt: String => Unit = _ => ()
 ) extends Agent:
 
-  private var startCallCount: Int = 0
+  private val startRecords = mutable.ArrayBuffer[Option[String]]()
   private val sendPromptCalls = mutable.ArrayBuffer[String]()
 
   private var phaseIdx = 0
   private var busyRemaining: Int = busyPhases.headOption.getOrElse(0)
   @volatile private var started = false
 
-  def recordedStartCalls: Int = startCallCount
+  /** Arguments passed to [[start]](initialPrompt); `None` for [[start]]() only. */
+  def recordedStarts: Seq[Option[String]] = startRecords.toSeq
+
+  def recordedStartCalls: Int = startRecords.size
   def recordedSendPrompts: Seq[String] = sendPromptCalls.toSeq
 
   override def start(): Unit =
     started = true
     phaseIdx = 0
     busyRemaining = busyPhases.lift(0).getOrElse(0)
-    startCallCount += 1
+    startRecords += None
+
+  /** Matches live agents: boot only; the initial task is not a [[sendPrompt]] call. */
+  override def start(initialPrompt: String): Unit =
+    started = true
+    phaseIdx = 0
+    busyRemaining = busyPhases.lift(0).getOrElse(0)
+    startRecords += Some(initialPrompt)
 
   override def stop(): Unit =
     started = false
