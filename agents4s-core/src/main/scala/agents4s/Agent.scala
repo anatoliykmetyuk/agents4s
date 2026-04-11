@@ -25,16 +25,11 @@ trait Agent:
     */
   def start(): Unit
 
-  /** Starts the session and submits the first task prompt (e.g. [[agents4s.pekko.LLMActor]]).
-    */
-  def start(initialPrompt: String): Unit
-
   /** Tears down the session.
     */
   def stop(): Unit
 
-  /** Submits user prompt to the agent. Implementations may block until the agent acknowledges
-    * submission (e.g. tmux drivers may wait until the TUI shows a busy state).
+  /** Submits user prompt to the agent. This method is non-blocking and returns immediately.
     *
     * @throws RuntimeException
     *   if the agent is busy or not started

@@ -40,7 +40,6 @@ lazy val pekko = project
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
       "org.apache.pekko" %% "pekko-actor-testkit-typed" % "1.1.2" % Test,
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
-      "com.lihaoyi" %% "os-lib" % "0.11.6",
       "com.lihaoyi" %% "upickle" % "4.4.3",
       "com.lihaoyi" %% "upickle-jsonschema" % "4.4.3",
     ),

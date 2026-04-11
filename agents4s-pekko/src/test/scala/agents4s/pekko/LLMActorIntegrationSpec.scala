@@ -41,17 +41,17 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
     (s"llm-act-$u", s"la-$u")
 
   private def withTimeout[T](body: => T): T =
-    failAfter(Span(900, org.scalatest.time.Seconds))(body)
+    failAfter(Span(100, org.scalatest.time.Seconds))(body)
 
   /** Workspace writes can lag the JSON result step slightly on a live agent. */
-  private def waitForRegularFile(path: java.nio.file.Path, maxWaitMs: Long = 120_000L): Boolean =
+  private def waitForRegularFile(path: java.nio.file.Path, maxWaitMs: Long = 100_000L): Boolean =
     val deadline = System.nanoTime() + maxWaitMs * 1_000_000L
     while System.nanoTime() < deadline do
       if Files.isRegularFile(path) then return true
       Thread.sleep(250L)
     false
 
-  import scala.concurrent.duration.* // for probe.receiveMessage(900.seconds)
+  import scala.concurrent.duration.* // for probe.receiveMessage(100.seconds)
 
   case class SimpleResult(answer: String) derives ReadWriter
   given JsonSchema[SimpleResult] = JsonSchema.derived
@@ -85,7 +85,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
             "Put only the digits of the numeric answer in field answer (as a string)."
           )
         )
-        probe.receiveMessage(900.seconds) match
+        probe.receiveMessage(100.seconds) match
           case SimpleResult(a)      => a should include("4")
           case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
     finally
@@ -110,7 +110,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
             "Field n must be the integer 56."
           )
         )
-        probe.receiveMessage(900.seconds) match
+        probe.receiveMessage(100.seconds) match
           case NumericResult(n)     => n shouldBe 56
           case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
     finally
@@ -135,7 +135,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
             "Field ok is true if the correct answer is yes."
           )
         )
-        probe.receiveMessage(900.seconds) match
+        probe.receiveMessage(100.seconds) match
           case BoolResult(ok)       => ok shouldBe true
           case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
     finally
@@ -160,7 +160,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
             "Echo name exactly as 'Alice Example' and age as 30 in the JSON fields."
           )
         )
-        probe.receiveMessage(900.seconds) match
+        probe.receiveMessage(100.seconds) match
           case PersonInfo(name, age) =>
             name should include("Alice")
             age shouldBe 30
@@ -192,7 +192,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
  |and created = true if the file exists with HELLO-$tok inside.""".stripMargin
           )
         )
-        probe.receiveMessage(900.seconds) match
+        probe.receiveMessage(100.seconds) match
           case FileTaskResult(path, _) =>
             val proofStr = proof.toAbsolutePath.normalize.toString
             path should (include(proofStr) or include(proof.toString))
@@ -222,7 +222,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
  |in the result file. No digits.""".stripMargin
           )
         )
-        probe.receiveMessage(900.seconds) match
+        probe.receiveMessage(100.seconds) match
           case LLMActor.LLMError(_) => ()
           case other =>
             assume(

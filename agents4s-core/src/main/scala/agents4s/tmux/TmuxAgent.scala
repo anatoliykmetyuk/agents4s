@@ -2,10 +2,8 @@ package agents4s.tmux
 
 import agents4s.Agent
 
-import java.nio.file.{Files, Path}
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.TimeoutException
-import scala.collection.mutable
+import java.nio.file.Files
 import scala.concurrent.duration.*
 
 /** Shared tmux session lifecycle; subclasses supply binary, command line, and TUI semantics. */
@@ -27,11 +25,6 @@ trait TmuxAgent extends Agent:
     val cmd = startCommand
     val target = tmuxServer.newSession(label, workspace, cmd)
     _pane = TmuxPane(socket, target)
-
-  override def start(initialPrompt: String): Unit =
-    start()
-    awaitIdle(900.seconds, pollInterval = 100.millis)
-    sendPrompt(initialPrompt, promptAsFile = true)
 
   override def stop(): Unit =
     tmuxServer.killSession(label)
