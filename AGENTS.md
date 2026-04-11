@@ -26,7 +26,7 @@ Runs `scalafmtCheckAll`.
 scripts/test.sh
 ```
 
-Runs **unit tests only** (`CursorTuiOpsTest`, `CursorAgentUnitTest`, `PathsTest`, `PaneTraitTest`, `LlmBridgeSpec`).
+Runs **unit tests only** (`CursorTuiOpsTest`, `CursorAgentUnitTest`, `PathsTest`, `PaneTraitTest`, `LLMActorSpec`).
 
 Integration tests (live `agent` + tmux) require:
 
@@ -34,7 +34,7 @@ Integration tests (live `agent` + tmux) require:
 scripts/test.sh -i
 ```
 
-This sets `CURSOR_DRIVER_INTEGRATION=1`. Integration tests are skipped/canceled when the variable is not set to `1` / `true` / `yes`, or when `agent` / `tmux` are missing from `PATH`.
+This sets `CURSOR_DRIVER_INTEGRATION=1`. Integration tests are skipped/canceled when the variable is not set to `1` / `true` / `yes`, or when `agent` / `tmux` are missing from `PATH`. That includes `CursorAgentIntegrationTest` and `LLMActorIntegrationSpec` (live `CursorAgent` + `LLMActor` with `composer-2-fast`, overridable via `CURSOR_DRIVER_MODEL`).
 
 Extra arguments are forwarded to `sbt` (after the optional `-i` flag).
 
@@ -44,7 +44,7 @@ Extra arguments are forwarded to `sbt` (after the optional `-i` flag).
 scripts/coverage.sh
 ```
 
-Runs **`clean` → `coverage` → unit tests only** (`CursorTuiOpsTest`, `CursorAgentUnitTest`, `PathsTest`, `PaneTraitTest`, `LlmBridgeSpec`) → `coverageReport`. HTML output is under `agents4s-core/target/scala-<version>/scoverage-report/` and `agents4s-pekko/target/scala-<version>/scoverage-report/` (artifact uploads use a recursive glob).
+Runs **`clean` → `coverage` → unit tests only** (`CursorTuiOpsTest`, `CursorAgentUnitTest`, `PathsTest`, `PaneTraitTest`, `LLMActorSpec`) → `coverageReport`. HTML output is under `agents4s-core/target/scala-<version>/scoverage-report/` and `agents4s-pekko/target/scala-<version>/scoverage-report/` (artifact uploads use a recursive glob).
 
 To aggregate coverage **including** integration tests (when `CURSOR_DRIVER_INTEGRATION` is set and `agent` / `tmux` are available; otherwise those tests are canceled):
 

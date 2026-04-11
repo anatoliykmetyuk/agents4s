@@ -22,7 +22,7 @@ jobs:
       - name: Format check
         run: sbt scalafmtCheckAll
       - name: Test with coverage (unit only)
-        run: sbt clean coverage "testOnly agents4s.cursor.CursorTuiOpsTest agents4s.cursor.CursorAgentUnitTest agents4s.tmux.PathsTest agents4s.tmux.PaneTraitTest agents4s.pekko.LlmBridgeSpec" coverageReport
+        run: sbt clean coverage "testOnly agents4s.cursor.CursorTuiOpsTest agents4s.cursor.CursorAgentUnitTest agents4s.tmux.PathsTest agents4s.tmux.PaneTraitTest agents4s.pekko.LLMActorSpec" coverageReport
       - name: Upload scoverage HTML report
         uses: actions/upload-artifact@v4
         with:
