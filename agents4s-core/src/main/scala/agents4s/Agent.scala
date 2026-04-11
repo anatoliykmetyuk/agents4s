@@ -22,14 +22,12 @@ trait Agent:
   def model: String
 
   /**
-   * Spawns or attaches to the agent session; optional `prompt` seeds the first turn.
+   * Spawns or attaches to the agent session
    *
-   * @param prompt
-   *   optional initial prompt
    * @throws RuntimeException
    *   if the agent binary is missing
    */
-  def start(prompt: String | Null): Unit
+  def start(): Unit
 
   /**
    * Tears down the session.
@@ -41,12 +39,12 @@ trait Agent:
    *
    * @throws RuntimeException
    *   if the agent is busy or not started
-   * @param text
+   * @param prompt
    *   the prompt to send to the agent
    * @param promptAsFile
    *   if true, the prompt is written to a staged file and the session gets a short path reference instead of pasting the body
    */
-  def sendPrompt(text: String, promptAsFile: Boolean): Unit
+  def sendPrompt(prompt: String, promptAsFile: Boolean): Unit
 
   /**
    * True when the agent has started. An agent in Started state may be either idle (ready to accept new prompts)

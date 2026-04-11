@@ -23,7 +23,6 @@ lazy val core = project
     name := "agents4s-core",
     Test / fork := true,
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %% "os-lib" % "0.11.8",
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
     ),
     Test / testOptions ++= Seq(

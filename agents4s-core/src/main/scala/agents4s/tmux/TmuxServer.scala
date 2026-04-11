@@ -1,8 +1,8 @@
 package agents4s.tmux
 
 import java.util.regex.Pattern
+import java.nio.file.Path
 
-import os.*
 import scala.language.implicitConversions
 
 object TmuxServer:
