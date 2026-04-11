@@ -3,7 +3,7 @@ package agents4s.tmux
 import scala.collection.mutable
 
 /** Deterministic [[Pane]] stand-in for waiter tests (Python test_tui_ops.MockPane). */
-final class MockPane(frames: Seq[Seq[String]]) extends Pane:
+class MockPane(frames: Seq[Seq[String]]) extends Pane:
 
   private var n: Int = 0
   val sendKeysCalls: mutable.Buffer[(String, Boolean)] = mutable.ArrayBuffer.empty

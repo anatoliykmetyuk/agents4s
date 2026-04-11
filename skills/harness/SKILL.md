@@ -62,7 +62,7 @@ Shell scripts live under **`scripts/`** and `cd` to the repo root before invokin
 
 ## Step 2 — Scaffold or extend the project
 
-For new projects, use [references/project-boilerplate.md](references/project-boilerplate.md): **`build.sbt`** (Pekko Typed + agents4s + os-lib + ScalaTest), **`application.conf`** (blocking dispatcher), **`scripts/*.sh`**, **`.gitignore`**, `out/`.
+For new projects, use [references/project-boilerplate.md](references/project-boilerplate.md): **`build.sbt`** (Pekko Typed + agents4s + ScalaTest), **`application.conf`** (blocking dispatcher), **`scripts/*.sh`**, **`.gitignore`**, `out/`.
 
 For incremental adds: locate existing actors and **only** add new files + minimal edits to parents (spawn route, message forwarding).
 
@@ -79,7 +79,7 @@ For **each** actor:
 
 - Each actor: `Behavior[ActorName.Command]` (or equivalent) from `ActorName.apply(...)` factory; file header `// Spec: specs/....md`; spec gets matching `<!-- impl: ... -->` when done.
 - **Mechanical** procedure steps → ordinary Scala in the behavior.
-- **Agentic** steps → `LlmBridge` (or injected port): read [references/llm-bridge-guide.md](references/llm-bridge-guide.md) for **`Agent` / `CursorAgent` / `AgentConfig`**, one-shot vs multi-turn, **`LlmPort`**, and a full **`pipeToSelf`** example. **Do not** search the filesystem for agents4s sources—use that guide only. Use **`Future`** on the blocking dispatcher + **`pipeToSelf`**, with a strict file/JSON contract for model output.
+- **Agentic** steps → `LlmBridge` (or injected port): read [references/llm-bridge-guide.md](references/llm-bridge-guide.md) for **`Agent` / `CursorAgent`**, multi-turn sessions, **`LlmPort`**, and a full **`pipeToSelf`** example. **Do not** search the filesystem for agents4s sources—use that guide only. Use **`Future`** on the blocking dispatcher + **`pipeToSelf`**, with a strict file/JSON contract for model output.
 - **`LlmBridge` messages** also live on `LlmBridge`’s companion object and are referenced as `LlmBridge.Run`, etc.
 
 ## Step 5 — `prompts/`
@@ -110,4 +110,4 @@ Follow [references/testing.md](references/testing.md): `ActorTestKit`, `TestProb
 ## Maintainer notes
 
 - **Cursor / repo copy:** this folder ships with the [agents4s-core](../../agents4s-core) module in this repo; `build.sbt` uses `publishLocal` artifacts.
-- **CursorAgent API:** treat [references/llm-bridge-guide.md](references/llm-bridge-guide.md) as the **canonical public API** summary for harness work (`Agent`, `CursorAgent`, `AgentConfig`, bridge examples). When agents4s changes, update that guide so users never need to hunt the library sources.
+- **CursorAgent API:** treat [references/llm-bridge-guide.md](references/llm-bridge-guide.md) as the **canonical public API** summary for harness work (`Agent`, `CursorAgent`, bridge examples). When agents4s changes, update that guide so users never need to hunt the library sources.

@@ -2,7 +2,7 @@ package agents4s.tmux
 
 import agents4s.Agent
 
-import java.nio.file.{ Files, Path }
+import java.nio.file.{Files, Path}
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 import scala.collection.mutable
@@ -37,7 +37,9 @@ trait TmuxAgent extends Agent:
     if !isStarted then
       throw new RuntimeException(s"${getClass.getSimpleName} is not started; call start() first")
     if isBusy then
-      throw new RuntimeException(s"${getClass.getSimpleName} is busy; wait for idle before sendPrompt")
+      throw new RuntimeException(
+        s"${getClass.getSimpleName} is busy; wait for idle before sendPrompt"
+      )
 
     val textToSend =
       if promptAsFile then

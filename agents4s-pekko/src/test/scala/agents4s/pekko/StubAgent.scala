@@ -12,21 +12,21 @@ final class StubAgent(
     onSendPrompt: String => Unit = _ => ()
 ) extends Agent:
 
-  private val startCalls = mutable.ArrayBuffer[Option[String]]()
+  private var startCallCount: Int = 0
   private val sendPromptCalls = mutable.ArrayBuffer[String]()
 
   private var phaseIdx = 0
   private var busyRemaining: Int = busyPhases.headOption.getOrElse(0)
   @volatile private var started = false
 
-  def recordedStarts: Seq[Option[String]] = startCalls.toSeq
+  def recordedStartCalls: Int = startCallCount
   def recordedSendPrompts: Seq[String] = sendPromptCalls.toSeq
 
-  override def start(prompt: String | Null): Unit =
+  override def start(): Unit =
     started = true
     phaseIdx = 0
     busyRemaining = busyPhases.lift(0).getOrElse(0)
-    startCalls += Option(prompt)
+    startCallCount += 1
 
   override def stop(): Unit =
     started = false

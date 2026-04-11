@@ -1,51 +1,39 @@
 package agents4s.cursor
 
-import agents4s.tmux.{AgentConfig, Pane, TmuxAgent}
+import agents4s.tmux.TmuxAgent
 
-import scala.concurrent.duration.Duration
+import java.nio.file.Path
 
 /** Drive a Cursor `agent` instance inside a detached tmux session. */
 class CursorAgent(
-    val workspacePath: os.Path,
+    val workspace: Path,
     val model: String,
-    val tmuxSocket: String = "cursor-agent",
-    val label: String = "agent",
-    val oneShot: Boolean = true,
-    val config: AgentConfig = AgentConfig()
+    val socket: String = "cursor-agent",
+    val label: String = "agent"
 ) extends TmuxAgent:
 
-  override def agentBinaryName: String = "agent"
+  val startCommand: Seq[String] =
+    Seq("agent", "--yolo", "--model", model, "--workspace", workspace.toString)
 
-  override def buildCommand(binaryPath: String): Seq[String] =
-    Seq(binaryPath, "--yolo", "--model", model, "--workspace", workspacePath.toString)
-
-  override protected def promptStagingDir: os.Path =
-    val d = workspacePath / ".cursor" / "prompts"
-    os.makeDir.all(d)
-    d
+  override def isStarted: Boolean = pane != null
 
   def isTrustPrompt: Boolean =
-    CursorTuiOps.isTrustPrompt(
-      CursorTuiOps.tailText(requirePane, nLines = 20)(using config)
-    )
+    if !isStarted then
+      throw new RuntimeException(s"${getClass.getSimpleName} is not started; call start() first")
+    CursorTuiOps.isTrustPrompt(CursorTuiOps.tailText(pane, nLines = 20))
 
   override def isIdle: Boolean =
-    pane.exists: _ =>
-      CursorTuiOps.isReady(CursorTuiOps.tailText(requirePane, nLines = 20)(using config))
+    if !isStarted then false
+    else
+      val text = CursorTuiOps.tailText(pane, nLines = 20)
+      if CursorTuiOps.isTrustPrompt(text) then
+        pane.sendKeys("a", enter = false)
+        false
+      else CursorTuiOps.isReady(text)
 
   override def isBusy: Boolean =
-    CursorTuiOps.isBusy(CursorTuiOps.tailText(requirePane, nLines = 20)(using config))
-
-  override def awaitBusy(timeout: Duration): Unit =
-    CursorTuiOps.awaitBusy(
-      requirePane,
-      timeout.toMillis / 1000.0
-    )(using config)
-
-  override def awaitIdle(timeout: Duration): Unit =
-    CursorTuiOps.awaitReady(
-      requirePane,
-      timeout.toMillis / 1000.0
-    )(using config)
+    if !isStarted then
+      throw new RuntimeException(s"${getClass.getSimpleName} is not started; call start() first")
+    CursorTuiOps.isBusy(CursorTuiOps.tailText(pane, nLines = 20))
 
 end CursorAgent

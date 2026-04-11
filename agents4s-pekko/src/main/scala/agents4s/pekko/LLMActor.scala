@@ -1,6 +1,6 @@
 package agents4s.pekko
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -8,6 +8,9 @@ import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import upickle.jsonschema.JsonSchema
 import upickle.default.*
 import upickle.jsonschema.*
+
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 
 import agents4s.Agent
 import agents4s.prompt.PromptTemplate
@@ -38,16 +41,16 @@ Output in the precise format specified above.
       outputInstructions: String
   ): Behavior[HeartbeatTick.type] =
     Behaviors.withTimers: timers =>
-      agent.start(inputPrompt)
+      agent.start()
       timers.startTimerWithFixedDelay(HeartbeatTimerKey, HeartbeatTick, 1.second)
-      awaitDone[O](replyTo, agent, outputInstructions)
+      runLoop[O](replyTo, agent, inputPrompt, outputInstructions)
 
   private def promptToWriteResult[O: JsonSchema: ReadWriter](
       agent: Agent,
       outputInstructions: String
-  ): os.Path =
+  ): java.nio.file.Path =
     val schema = upickle.default.schema[O].toString
-    val resultFilePath = os.temp()
+    val resultFilePath = Files.createTempFile("agents4s-llm-result-", ".json")
     val prompt = PromptTemplate.substitute(
       ResultPromptTemplate,
       Map(
@@ -59,45 +62,70 @@ Output in the precise format specified above.
     agent.sendPrompt(prompt, promptAsFile = true)
     resultFilePath
 
-  private def awaitDone[O: JsonSchema: ReadWriter](
+  /** Heartbeat loop: send input once the agent is idle, then drive JSON result read / retries. */
+  private def runLoop[O: JsonSchema: ReadWriter](
       replyTo: ActorRef[O | LLMError],
       agent: Agent,
+      inputPrompt: String,
       outputInstructions: String
   ): Behavior[HeartbeatTick.type] =
-    Behaviors.receiveMessage: _ =>
-      if agent.isBusy then Behaviors.same
-      else
-        val filepath = promptToWriteResult[O](agent, outputInstructions)
-        awaitResultWritten[O](replyTo, agent, filepath, outputInstructions)
+    var inputSent = false
+    var resultPathOpt: Option[java.nio.file.Path] = None
+    var attemptNo = 1
+    val maxAttempts = 3
+    /** Avoid reading the result file while the TUI still shows a stale idle tail (non-blocking [[Agent.sendPrompt]]). */
+    var sawBusySinceResultPrompt = false
+    var resultPromptStartNanos: Long = 0L
+    /** When [[Agent.isBusy]] is never true (e.g. stubs), still advance so we do not spin forever. */
+    val busyFallbackAfter: FiniteDuration = 2.seconds
 
-  private def awaitResultWritten[O: JsonSchema: ReadWriter](
-      replyTo: ActorRef[O | LLMError],
-      agent: Agent,
-      resultFilePath: os.Path,
-      outputInstructions: String,
-      attemptNo: Int = 1,
-      maxAttempts: Int = 3
-  ): Behavior[HeartbeatTick.type] =
-    Behaviors.receiveMessage: _ =>
-      if agent.isBusy then Behaviors.same
-      else
-        try
-          val fileContents = os.read(resultFilePath)
-          val deserialized = upickle.default.read[O](fileContents)
-          replyTo ! deserialized
-          Behaviors.stopped
-        catch
-          case e: Exception =>
-            if attemptNo >= maxAttempts then
-              replyTo ! LLMError(e)
-              Behaviors.stopped
-            else
-              val filepath = promptToWriteResult[O](agent, outputInstructions)
-              awaitResultWritten[O](
-                replyTo,
-                agent,
-                filepath,
-                outputInstructions,
-                attemptNo = attemptNo + 1,
-                maxAttempts
-              )
+    def beginResultAttempt(path: java.nio.file.Path, resetAttemptCounter: Boolean): Unit =
+      resultPathOpt = Some(path)
+      if resetAttemptCounter then attemptNo = 1
+      sawBusySinceResultPrompt = false
+      resultPromptStartNanos = System.nanoTime()
+
+    def step: Behavior[HeartbeatTick.type] =
+      Behaviors.receiveMessage: _ =>
+        if !inputSent then
+          if agent.isBusy then step
+          else
+            agent.sendPrompt(inputPrompt, promptAsFile = true)
+            inputSent = true
+            step
+        else
+          resultPathOpt match
+            case None =>
+              if agent.isBusy then step
+              else
+                beginResultAttempt(
+                  promptToWriteResult[O](agent, outputInstructions),
+                  resetAttemptCounter = true
+                )
+                step
+            case Some(path) =>
+              val busyFallbackDue =
+                System.nanoTime() - resultPromptStartNanos > busyFallbackAfter.toNanos
+              if !sawBusySinceResultPrompt then
+                if agent.isBusy || busyFallbackDue then sawBusySinceResultPrompt = true
+                step
+              else if agent.isBusy then step
+              else
+                try
+                  val fileContents = Files.readString(path, StandardCharsets.UTF_8)
+                  val deserialized = upickle.default.read[O](fileContents)
+                  replyTo ! deserialized
+                  Behaviors.stopped
+                catch
+                  case e: Exception =>
+                    if attemptNo >= maxAttempts then
+                      replyTo ! LLMError(e)
+                      Behaviors.stopped
+                    else
+                      attemptNo += 1
+                      beginResultAttempt(
+                        promptToWriteResult[O](agent, outputInstructions),
+                        resetAttemptCounter = false
+                      )
+                      step
+    step

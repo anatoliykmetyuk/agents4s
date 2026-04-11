@@ -1,5 +1,7 @@
 package agents4s.tmux
 
+import java.nio.file.Path
+
 import scala.collection.mutable
 
 /** Test double: no shell tmux calls; records [[killSession]] invocations. */
@@ -16,7 +18,7 @@ final class RecordingTmuxServer(socketName: String) extends TmuxServer(socketNam
 
   override def newSession(
       sessionName: String,
-      startDirectory: os.Path,
+      startDirectory: Path,
       command: Seq[String]
   ): String =
     s"$sessionName:0.0"

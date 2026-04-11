@@ -1,5 +1,6 @@
 package agents4s.pekko
 
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.regex.Pattern
 
@@ -21,16 +22,22 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     testKit.shutdownTestKit()
     super.afterAll()
 
-  private def tmpWorkspace: os.Path =
-    os.Path(Files.createTempDirectory("llm-actor-spec").toFile)
+  private def tmpWorkspace: java.nio.file.Path =
+    Files.createTempDirectory("llm-actor-spec")
 
   private val jsonPathPattern: Pattern =
     Pattern.compile("following path:\\s*(.+)\\s*", Pattern.MULTILINE)
 
-  def extractJsonFilePath(prompt: String): os.Path =
+  def extractJsonFilePath(prompt: String): java.nio.file.Path =
     val m = jsonPathPattern.matcher(prompt)
     m.find() shouldBe true
-    os.Path(m.group(1).trim)
+    java.nio.file.Path.of(m.group(1).trim)
+
+  /** LLMActor sends the task prompt first, then JSON result prompts; only the latter contain a
+    * path.
+    */
+  private def whenJsonResult(p: String)(f: java.nio.file.Path => Unit): Unit =
+    if p.contains("following path:") then f(extractJsonFilePath(p))
 
   // --- Output types for tests (ReadWriter + JsonSchema) ---
 
@@ -52,11 +59,11 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("happy path: immediate idle, valid JSON") {
     val ws = tmpWorkspace
     val stub = new StubAgent(
-      ws.toNIO,
+      ws,
       busyPhases = List(0, 0),
       onSendPrompt = p =>
-        val path = extractJsonFilePath(p)
-        os.write.over(path, """{"value":"hello"}""")
+        whenJsonResult(p): path =>
+          Files.writeString(path, """{"value":"hello"}""", StandardCharsets.UTF_8)
     )
     val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
     val child = testKit.spawn(
@@ -74,11 +81,11 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("happy path: busy ticks before result prompt, then busy before read") {
     val ws = tmpWorkspace
     val stub = new StubAgent(
-      ws.toNIO,
+      ws,
       busyPhases = List(2, 1),
       onSendPrompt = p =>
-        val path = extractJsonFilePath(p)
-        os.write.over(path, """{"value":"delayed"}""")
+        whenJsonResult(p): path =>
+          Files.writeString(path, """{"value":"delayed"}""", StandardCharsets.UTF_8)
     )
     val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
     val child = testKit.spawn(
@@ -96,11 +103,11 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("complex nested output type") {
     val ws = tmpWorkspace
     val stub = new StubAgent(
-      ws.toNIO,
+      ws,
       busyPhases = List(0, 0),
       onSendPrompt = p =>
-        val path = extractJsonFilePath(p)
-        os.write.over(path, """{"outer":{"value":"in"},"n":42}""")
+        whenJsonResult(p): path =>
+          Files.writeString(path, """{"outer":{"value":"in"},"n":42}""", StandardCharsets.UTF_8)
     )
     val probe = testKit.createTestProbe[NestedResult | LLMActor.LLMError]()
     val child = testKit.spawn(
@@ -119,13 +126,13 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     val ws = tmpWorkspace
     var attempt = 0
     val stub = new StubAgent(
-      ws.toNIO,
-      busyPhases = List(0, 0, 0),
+      ws,
+      busyPhases = List(0, 0, 0, 0),
       onSendPrompt = p =>
-        attempt += 1
-        val path = extractJsonFilePath(p)
-        if attempt == 1 then os.write.over(path, "not json {{{")
-        else os.write.over(path, """{"value":"fixed"}""")
+        whenJsonResult(p): path =>
+          attempt += 1
+          if attempt == 1 then Files.writeString(path, "not json {{{", StandardCharsets.UTF_8)
+          else Files.writeString(path, """{"value":"fixed"}""", StandardCharsets.UTF_8)
     )
     val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
     val child = testKit.spawn(
@@ -137,18 +144,18 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
       )
     )
     probe.expectMessage(45.seconds, TestResult("fixed"))
-    stub.recordedSendPrompts should have size 2
+    stub.recordedSendPrompts should have size 3
     probe.expectTerminated(child, 5.seconds)
   }
 
   test("failure: invalid JSON on all three read attempts") {
     val ws = tmpWorkspace
     val stub = new StubAgent(
-      ws.toNIO,
-      busyPhases = List(0, 0, 0, 0),
+      ws,
+      busyPhases = List(0, 0, 0, 0, 0),
       onSendPrompt = p =>
-        val path = extractJsonFilePath(p)
-        os.write.over(path, "%%%")
+        whenJsonResult(p): path =>
+          Files.writeString(path, "%%%", StandardCharsets.UTF_8)
     )
     val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
     val child = testKit.spawn(
@@ -162,7 +169,8 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     probe.receiveMessage(45.seconds) match
       case LLMActor.LLMError(e) => e shouldBe a[Exception]
       case other                => fail(s"expected LLMError, got $other")
-    stub.recordedSendPrompts should have size 3
+    // task prompt + three JSON result retries
+    stub.recordedSendPrompts should have size 4
     probe.expectTerminated(child, 5.seconds)
   }
 
@@ -170,13 +178,13 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
     val ws = tmpWorkspace
     var n = 0
     val stub = new StubAgent(
-      ws.toNIO,
-      busyPhases = List(0, 0, 0),
+      ws,
+      busyPhases = List(0, 0, 0, 0),
       onSendPrompt = p =>
-        n += 1
-        val path = extractJsonFilePath(p)
-        if n == 1 then os.write.over(path, "")
-        else os.write.over(path, """{"value":"ok"}""")
+        whenJsonResult(p): path =>
+          n += 1
+          if n == 1 then Files.writeString(path, "", StandardCharsets.UTF_8)
+          else Files.writeString(path, """{"value":"ok"}""", StandardCharsets.UTF_8)
     )
     val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
     val child = testKit.spawn(
@@ -194,15 +202,19 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("structural: start and sendPrompt carry expected content") {
     val ws = tmpWorkspace
     val outInstr = "OUTPUT_INSTR_UNIQUE"
+    var sendIdx = 0
     val stub = new StubAgent(
-      ws.toNIO,
+      ws,
       busyPhases = List(0, 0),
       onSendPrompt = p =>
-        val path = extractJsonFilePath(p)
-        p should include(outInstr)
-        p should include(path.toString)
-        p should include("value") // field name from TestResult schema
-        os.write.over(path, """{"value":"v"}""")
+        sendIdx += 1
+        if sendIdx == 1 then p should include("INPUT_BODY_UNIQUE")
+        else
+          val path = extractJsonFilePath(p)
+          p should include(outInstr)
+          p should include(path.toString)
+          p should include("value") // field name from TestResult schema
+          Files.writeString(path, """{"value":"v"}""", StandardCharsets.UTF_8)
     )
     val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
     val child = testKit.spawn(
@@ -214,8 +226,9 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
       )
     )
     probe.expectMessage(30.seconds, TestResult("v"))
-    stub.recordedStarts shouldBe Seq(Some("INPUT_BODY_UNIQUE"))
-    val p = stub.recordedSendPrompts.head
+    stub.recordedStartCalls shouldBe 1
+    stub.recordedSendPrompts.head should include("INPUT_BODY_UNIQUE")
+    val p = stub.recordedSendPrompts(1)
     p should include("Write the result of your operation to JSON file")
     p should include("following schema")
     p should include(outInstr)
@@ -225,14 +238,15 @@ class LLMActorSpec extends AnyFunSuite with Matchers with BeforeAndAfterAll:
   test("large payload round-trip") {
     val ws = tmpWorkspace
     val stub = new StubAgent(
-      ws.toNIO,
+      ws,
       busyPhases = List(0, 0),
       onSendPrompt = p =>
-        val path = extractJsonFilePath(p)
-        os.write.over(
-          path,
-          """{"a":"A","b":1,"c":true,"d":"D","e":2}"""
-        )
+        whenJsonResult(p): path =>
+          Files.writeString(
+            path,
+            """{"a":"A","b":1,"c":true,"d":"D","e":2}""",
+            StandardCharsets.UTF_8
+          )
     )
     val probe = testKit.createTestProbe[LargePayload | LLMActor.LLMError]()
     val child = testKit.spawn(

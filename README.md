@@ -15,28 +15,26 @@ scripts/setup.sh
 Example:
 
 ```scala
-import os.*
-import agents4s.cursor.CursorAgent
-import agents4s.tmux.AgentConfig
+import java.nio.file.Path
+import scala.concurrent.duration.*
 
-val repo = Path("/path/to/your/repo")
+import agents4s.cursor.CursorAgent
+
+val repo = Path.of("/path/to/your/repo")
 val driver = new CursorAgent(repo, model = "your-model-id")
 
-if driver.start(Some("Do one task and summarize.")) != 0 then
-  sys.exit(1)
+driver.start()
+driver.sendPrompt("Do one task and summarize.", promptAsFile = true)
+driver.awaitIdle(30.minutes)
 
-// Or keep the session for multiple prompts:
-val longLived = new CursorAgent(
-  repo,
-  model = "your-model-id",
-  oneShot = false,
-  config = AgentConfig()
-)
-if longLived.start(None) != 0 then sys.exit(1)
-longLived.sendPrompt("First instruction.")
-longLived.awaitDone()
-longLived.sendPrompt("Second instruction.")
-longLived.awaitDone()
+// Multi-turn session:
+val longLived = new CursorAgent(repo, model = "your-model-id")
+longLived.start()
+longLived.awaitIdle(30.minutes)
+longLived.sendPrompt("First instruction.", promptAsFile = true)
+longLived.awaitIdle(30.minutes)
+longLived.sendPrompt("Second instruction.", promptAsFile = true)
+longLived.awaitIdle(30.minutes)
 longLived.stop()
 ```
 
@@ -54,15 +52,15 @@ Install (requires Node.js for `npx`):
 
 | Member | Role |
 |--------|------|
-| Constructor | `new CursorAgent(workspace, model, tmuxSocket = …, label = …, oneShot = …, config = AgentConfig(…))` — optional tmux socket, session label; `oneShot` controls whether `start` tears down the session in `finally`; `AgentConfig` holds `quiet`, factories, polling, and I/O streams. |
-| `start` | `start(prompt: Option[String] = None): Int` — launch `agent` in tmux and set `pane`. `None`: return when the session exists. `Some`: run to completion. Returns `0`, `127` (no `agent`), or `1`. |
-| `sendPrompt` | `sendPrompt(text, timeoutS = …, promptAsFile = true)` — after `start`, wait for readiness, send prompt (default: temp `.md` under `.cursor/prompts/` plus “read file” line), then wait until busy. |
-| `isTrustPrompt` / `isReady` / `isBusy` | Snapshot predicates on the current pane tail (Cursor TUI). |
-| `awaitReady` / `awaitBusy` / `awaitDone` | Blocking wait helpers. |
-| `pane` | `Option[agents4s.tmux.Pane]` after a successful `start`. |
-| `stop` | Kill tmux session (if `killRemoteOnStop` in config), delete tracked prompt files, clear `pane`. |
+| Constructor | `new CursorAgent(workspace: java.nio.file.Path, model: String, socket = "cursor-agent", label = "agent")` — workspace root, model id, optional tmux `-L` socket name and session name. |
+| `start` | `start(): Unit` — launch `agent` in a detached tmux session and bind `pane`. |
+| `sendPrompt` | `sendPrompt(prompt, promptAsFile)` — non-blocking; with `promptAsFile = true`, writes a temp `.md` and sends a “read file” line. |
+| `isTrustPrompt` / `isIdle` / `isBusy` | Snapshot predicates on the current pane tail (Cursor TUI). |
+| `awaitStarted` / `awaitBusy` / `awaitIdle` | Blocking wait helpers from `Agent` (1s polling). |
+| `pane` | Live `agents4s.tmux.Pane` after `start()` until `stop()`. |
+| `stop` | Kill the tmux session and clear state. |
 
-Shared tmux helpers: `agents4s.tmux.TmuxServer`, `TmuxPane`, `Paths`, `TmuxServer.stripAnsi`. Cursor-specific TUI detection lives in **`agents4s.cursor.CursorTuiOps`**.
+Shared tmux helpers: `agents4s.tmux.TmuxServer`, `TmuxPane`, `Paths`, `TmuxServer.stripAnsi`. Cursor-specific TUI detection lives in **`agents4s.cursor.CursorTuiOps`** (optional `pollIntervalMs` on await helpers).
 
 ## Lint & format
 

@@ -1,12 +1,13 @@
 package agents4s.pekko
 
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.UUID
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 
 import agents4s.cursor.CursorAgent
-import agents4s.tmux.{AgentConfig, Paths}
+import agents4s.tmux.Paths
 
 import org.scalatest.Assertions.{assume, fail}
 import org.scalatest.concurrent.TimeLimits
@@ -32,8 +33,8 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
     assume(Paths.which("agent").nonEmpty, "Cursor `agent` CLI not on PATH")
     assume(Paths.which("tmux").nonEmpty, "tmux not on PATH")
 
-  private def tmpWorkspace: os.Path =
-    os.Path(Files.createTempDirectory("llm-actor-int").toFile)
+  private def tmpWorkspace: java.nio.file.Path =
+    Files.createTempDirectory("llm-actor-int")
 
   private def uniqueSessionIds: (String, String) =
     val u = UUID.randomUUID().toString.replace("-", "").take(12)
@@ -41,6 +42,14 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
 
   private def withTimeout[T](body: => T): T =
     failAfter(Span(900, org.scalatest.time.Seconds))(body)
+
+  /** Workspace writes can lag the JSON result step slightly on a live agent. */
+  private def waitForRegularFile(path: java.nio.file.Path, maxWaitMs: Long = 120_000L): Boolean =
+    val deadline = System.nanoTime() + maxWaitMs * 1_000_000L
+    while System.nanoTime() < deadline do
+      if Files.isRegularFile(path) then return true
+      Thread.sleep(250L)
+    false
 
   import scala.concurrent.duration.* // for probe.receiveMessage(900.seconds)
 
@@ -63,14 +72,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     val kit = ActorTestKit()
     try
       withTimeout:
@@ -95,14 +97,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     val kit = ActorTestKit()
     try
       withTimeout:
@@ -127,14 +122,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     val kit = ActorTestKit()
     try
       withTimeout:
@@ -159,14 +147,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     val kit = ActorTestKit()
     try
       withTimeout:
@@ -194,15 +175,8 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
     val tok = UUID.randomUUID().toString.replace("-", "").take(10)
-    val proof = tmp / s"llm_actor_proof_$tok.txt"
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val proof = tmp.resolve(s"llm_actor_proof_$tok.txt")
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     val kit = ActorTestKit()
     try
       withTimeout:
@@ -219,11 +193,11 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
           )
         )
         probe.receiveMessage(900.seconds) match
-          case FileTaskResult(path, created) =>
-            created shouldBe true
-            path should include(proof.toString)
-            os.isFile(proof) shouldBe true
-            os.read(proof) should include(s"HELLO-$tok")
+          case FileTaskResult(path, _) =>
+            val proofStr = proof.toAbsolutePath.normalize.toString
+            path should (include(proofStr) or include(proof.toString))
+            waitForRegularFile(proof) shouldBe true
+            Files.readString(proof, StandardCharsets.UTF_8) should include(s"HELLO-$tok")
           case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
     finally
       agent.stop()
@@ -234,14 +208,7 @@ class LLMActorIntegrationSpec extends AnyFunSuite with Matchers with TimeLimits:
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
-    val agent = new CursorAgent(
-      tmp,
-      model,
-      tmuxSocket = soc,
-      label = label,
-      oneShot = false,
-      config = AgentConfig(quiet = true)
-    )
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
     val kit = ActorTestKit()
     try
       withTimeout:

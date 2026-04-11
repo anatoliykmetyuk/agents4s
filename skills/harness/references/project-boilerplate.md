@@ -51,7 +51,6 @@ lazy val harness = project
     libraryDependencies ++= Seq(
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
       "me.anatoliikmt" %% "agents4s-pekko" % "0.1.0-SNAPSHOT",
-      "com.lihaoyi" %% "os-lib" % "0.11.8",
       "org.apache.pekko" %% "pekko-actor-testkit-typed" % "1.1.2" % Test,
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
     ),
