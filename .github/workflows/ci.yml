@@ -22,12 +22,12 @@ jobs:
       - name: Format check
         run: sbt scalafmtCheckAll
       - name: Test with coverage (unit only)
-        run: sbt clean coverage "testOnly agents4s.cursor.CursorTuiOpsTest agents4s.cursor.CursorAgentUnitTest agents4s.tmux.PathsTest agents4s.tmux.PaneTraitTest" coverageReport
+        run: sbt clean coverage "testOnly agents4s.cursor.CursorTuiOpsTest agents4s.cursor.CursorAgentUnitTest agents4s.tmux.PathsTest agents4s.tmux.PaneTraitTest agents4s.pekko.LlmBridgeSpec" coverageReport
       - name: Upload scoverage HTML report
         uses: actions/upload-artifact@v4
         with:
           name: scoverage-report
-          path: target/scala-*/scoverage-report
+          path: "**/target/scala-*/scoverage-report"
 
   coverage-integration:
     name: Coverage (optional, all tests)
@@ -49,4 +49,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: scoverage-report-full
-          path: target/scala-*/scoverage-report
+          path: "**/target/scala-*/scoverage-report"

@@ -11,11 +11,35 @@ ThisBuild / licenses := List(
 
 lazy val root = project
   .in(file("."))
+  .aggregate(core, pekko)
+  .settings(
+    name := "agents4s-root",
+    publish / skip := true,
+  )
+
+lazy val core = project
+  .in(file("agents4s"))
   .settings(
     name := "agents4s",
     Test / fork := true,
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "os-lib" % "0.11.8",
+      "org.scalatest" %% "scalatest" % "3.2.20" % Test,
+    ),
+    Test / testOptions ++= Seq(
+      Tests.Argument(TestFrameworks.ScalaTest, "-oDF"),
+    ),
+  )
+
+lazy val pekko = project
+  .in(file("agents4s-pekko"))
+  .dependsOn(core)
+  .settings(
+    name := "agents4s-pekko",
+    Test / fork := true,
+    libraryDependencies ++= Seq(
+      "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
+      "org.apache.pekko" %% "pekko-actor-testkit-typed" % "1.1.2" % Test,
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
     ),
     Test / testOptions ++= Seq(

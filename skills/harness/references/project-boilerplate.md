@@ -36,9 +36,9 @@ exec sbt test "$@"
 
 ## `build.sbt` (snippet)
 
-**agents4s** is a **local SNAPSHOT** (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in the agents4s repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes.
+**agents4s** and **agents4s-pekko** are **local SNAPSHOT** artifacts (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in the agents4s repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes.
 
-**Pekko** — Apache Pekko Typed for Scala 3 (adjust version if needed):
+**Pekko** — Apache Pekko Typed for Scala 3 (adjust version if needed). Use **`me.anatoliikmt` %% `agents4s-pekko`** for the heartbeat **`LlmBridge`** actor (see [llm-bridge-guide.md](llm-bridge-guide.md)); it depends on **`agents4s`** transitively.
 
 ```scala
 val scala3Version = "3.8.3"
@@ -50,7 +50,7 @@ lazy val harness = project
     scalaVersion := scala3Version,
     libraryDependencies ++= Seq(
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
-      "me.anatoliikmt" %% "agents4s" % "0.1.0-SNAPSHOT",
+      "me.anatoliikmt" %% "agents4s-pekko" % "0.1.0-SNAPSHOT",
       "com.lihaoyi" %% "os-lib" % "0.11.8",
       "org.apache.pekko" %% "pekko-actor-testkit-typed" % "1.1.2" % Test,
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
@@ -60,7 +60,7 @@ lazy val harness = project
   )
 ```
 
-Add a JSON library (e.g. **ujson** / Circe) if the `LlmBridge` parses model output in-process.
+Add a JSON library (e.g. **ujson** / Circe) if your per-step **`LlmBridge`** subclass parses model output in-process.
 
 ## `src/main/resources/application.conf`
 
@@ -73,7 +73,7 @@ pekko.actor.default-dispatcher {
   }
 }
 
-# Use for CursorAgent / blocking IO inside spawned futures
+# Optional: blocking CursorAgent / IO inside Future + pipeToSelf (not needed for agents4s.pekko.LlmBridge)
 blocking-llm-dispatcher {
   type = Dispatcher
   executor = "thread-pool-executor"
@@ -112,7 +112,7 @@ my-harness/
 ├── src/main/scala/<pkg>/
 │   ├── Main.scala
 │   ├── ...                    # one Scala file per actor typical
-│   └── LlmBridge.scala
+│   └── GatekeeperBridge.scala  # e.g. extends agents4s.pekko.LlmBridge
 ├── src/main/resources/application.conf
 ├── src/test/scala/<pkg>/
 ├── build.sbt

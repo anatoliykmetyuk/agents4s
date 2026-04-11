@@ -81,13 +81,9 @@ trait TmuxAgent extends Agent:
       catch case _: Exception => return
       remaining -= 1
 
-  override def sendPrompt(
-      text: String,
-      timeoutS: Double = Agent.DefaultTimeoutS,
-      promptAsFile: Boolean = true
-  ): Unit =
+  /** Send prompt keys without blocking on ready/busy (for actor heartbeat polling). */
+  def firePrompt(text: String, promptAsFile: Boolean = true): Unit =
     val p = requirePane
-    awaitReady(timeoutS)
     val textToSend =
       if promptAsFile then
         os.makeDir.all(promptStagingDir)
@@ -104,6 +100,14 @@ trait TmuxAgent extends Agent:
     p.sendKeys(textToSend, enter = false)
     config.postSendKeysPause(0.2)
     p.sendKeys("", enter = true)
+
+  override def sendPrompt(
+      text: String,
+      timeoutS: Double = Agent.DefaultTimeoutS,
+      promptAsFile: Boolean = true
+  ): Unit =
+    awaitReady(timeoutS)
+    firePrompt(text, promptAsFile)
     awaitBusy()
 
   /** @return 0 success, 127 missing agent binary, 1 error/timeout */

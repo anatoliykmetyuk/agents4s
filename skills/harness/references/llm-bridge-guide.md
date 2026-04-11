@@ -6,7 +6,7 @@
 
 ## agents4s API reference
 
-All types are from **`me.anatoliikmt`** artifact **`agents4s`** (see [project-boilerplate.md](project-boilerplate.md)).
+Core types are from **`me.anatoliikmt`** artifact **`agents4s`**; the reusable Pekko bridge is **`me.anatoliikmt` %% `agents4s-pekko`** (see [project-boilerplate.md](project-boilerplate.md)).
 
 ### `agents4s.Agent` (trait)
 
@@ -19,6 +19,7 @@ Implemented by `CursorAgent`. **`os.Path`** is Li Haoyi’s **`os-lib`** (`com.l
 | `def start(prompt: Option[String] = None): Int` | Start tmux session and optional first prompt. **Returns:** `0` success, `127` if the agent binary is missing on `PATH`, `1` on error/timeout. With `oneShot = true` and `Some(prompt)`, blocks until work completes then runs `stop()` in `finally`. |
 | `def stop(interruptAttempts: Int = 10): Unit` | If busy, send interrupts; optionally kill tmux session; clean staged prompt files. |
 | `def sendPrompt(text: String, timeoutS: Double = Agent.DefaultTimeoutS, promptAsFile: Boolean = true): Unit` | Wait until **ready**, then send text. If `promptAsFile = true`, writes markdown to a temp file under the workspace and sends a short “read this path” instruction (avoids huge pastes). Then waits until **busy**. |
+| `def firePrompt(text: String, promptAsFile: Boolean = true): Unit` | On **`TmuxAgent`**: same key injection as `sendPrompt` but **does not** call `awaitReady` / `awaitBusy`. For **`agents4s.pekko.LlmBridge`** (heartbeat actor) and other non-blocking drivers that poll `isReady` / `isBusy` themselves. |
 | `def isReady: Boolean` | TUI shows the “idle / footer” state (implementation uses Cursor footer heuristics). |
 | `def isBusy: Boolean` | TUI shows the agent working. |
 | `def awaitReady(timeoutS: Double = …): Unit` | Block until ready or timeout (`TimeoutException`). May auto-dismiss a “Trust this workspace” prompt. |
@@ -60,13 +61,21 @@ Import: `import agents4s.tmux.AgentConfig`
 
 ---
 
-## Bridge pattern (recap)
+## Recommended: `agents4s.pekko.LlmBridge` (heartbeat actor)
 
-1. A dedicated **`LlmBridge`** typed actor accepts **`Run(..., replyTo)`**.
-2. Blocking work runs in **`Future { … }`** on Pekko’s **blocking dispatcher** (see [project-boilerplate.md](project-boilerplate.md) — config key `blocking-llm-dispatcher`).
-3. Use **`context.pipeToSelf`** to get back onto the actor thread and **`replyTo !`** the typed result.
+Use the library **`agents4s-pekko`** for harness steps that must stay on the actor thread: **`LlmBridge[In, Out, A <: TmuxAgent]`** is an abstract class you extend once per step.
 
-Parents send one command and wait for **`Result`** — same idea as delegating to any other child actor.
+**Flow (all non-blocking on the actor thread):**
+
+1. One actor: **`behavior`** returns **`Behavior[In | LlmBridgeTick.type]`** so timers can deliver **`LlmBridgeTick`** to the same mailbox. Send only **`In`** from your harness — **`LlmBridgeTick`** is reserved for the library heartbeat.
+2. On **`start(None)`**, build a **`CursorAgent`** (or subclass) with **`oneShot = false`** and bring tmux up.
+3. On a **timer heartbeat**, poll **`isReady`**, then **`firePrompt(buildPrompt(input))`**; poll **`isBusy`** until the main work finishes; then **`firePrompt(followUpPrompt(...), promptAsFile = false)`** for JSON to **`outputPath(input)`**; poll again; **`os.read`**, **`parseOutput`**, **`agent.stop()`**.
+
+Implement **`createAgent`**, **`buildPrompt`**, **`outputPath`**, **`parseOutput`**; optionally **`heartbeatInterval`** and **`followUpPrompt`**.
+
+**Where replies go:** Pekko Typed has no `sender()`. Pass the destination when you spawn: **`context.spawn(GatekeeperBridge.behavior(self), "gatekeeper")`** (or a **`messageAdapter`**). **`behavior(replyTo: ActorRef[Out])`** closes over that ref for **`Out`** when a run completes.
+
+If **`start(None)`** is non-zero, the actor stops the agent and sends **no** **`Out`**. A second **`In`** while a job is in flight is **ignored**.
 
 ---
 
@@ -127,133 +136,69 @@ Rules of thumb:
 
 After success:
 
-1. Read the artifact path (JSON, markdown, etc.).
-2. Parse in the blocking `Future` if you use Circe/ujson — add the dependency in `build.sbt`.
-3. Reply with **`Ok(parsed)`** / **`Failed(reason)`** so parents can retry or escalate per spec.
-
-If parsing fails, return a **structured** failure, not a silent default.
+1. Read the artifact path (JSON, markdown, etc.). **`LlmBridge`** does this after the follow-up step when **`isBusy`** is false.
+2. Parse with Circe/ujson (or plain string checks) inside **`parseOutput`** — add the JSON dependency in **`build.sbt`**.
+3. Implement **`parseOutput(raw: String): Out`**; invalid JSON or IO issues should **`throw`** so the supervisor can handle failures, or return a domain-specific error value inside **`Out`** if your harness models failures that way.
 
 ---
 
-## `LlmPort` seam (production vs tests)
-
-Define a **small port** the bridge calls so unit tests never construct **`CursorAgent`**:
+## Example: per-step bridge (extend `agents4s.pekko.LlmBridge`)
 
 ```scala
-import scala.concurrent.{ExecutionContext, Future}
-import agents4s.Agent
-
-trait LlmPort:
-  /** Run one agentic step: start session, send prompt, wait until idle, return exit code + optional artifact text. */
-  def runOneShot(
-      prompt: String,
-      workspace: os.Path,
-      model: String,
-      timeoutS: Double = Agent.DefaultTimeoutS
-  )(using ExecutionContext): Future[Either[String, Option[String]]]
-```
-
-**Production** implementation: inside the `Future`, construct **`CursorAgent`**, call **`start(Some(prompt))`**, then read **`outputPath`** if needed and return `Right(Some(content))` or `Right(None)` if the contract is exit-code-only.
-
-**Test** implementation: return **`Future.successful(Right(Some(\"{}\")))`** or **`Future.successful(Left("boom"))`** to simulate failures.
-
----
-
-## Example: `LlmBridge` actor (typed, `pipeToSelf`)
-
-Adjust package names and `LlmResult` to your harness. This version uses **raw file text** so the snippet stays valid without an extra JSON library; swap in ujson/Circe when you add that dependency.
-
-```scala
-// Example only — place under your harness package
-import org.apache.pekko.actor.typed.*
-import org.apache.pekko.actor.typed.scaladsl.*
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
-import agents4s.Agent
-
-object LlmBridge:
-
-  sealed trait Command
-  final case class Run(
-      promptMarkdown: String,
-      workspace: os.Path,
-      readOutputPath: Option[os.Path], // if Some, bridge reads file after agent completes
-      model: String,
-      timeoutS: Double,
-      replyTo: ActorRef[Result]
-  ) extends Command
-
-  private final case class Completed(result: Result, replyTo: ActorRef[Result]) extends Command
-
-  sealed trait Result
-  final case class Ok(exitCode: Int, outputText: Option[String]) extends Result
-  final case class Failed(reason: String) extends Result
-
-  /** @param blockingEc from system.dispatchers.lookup("blocking-llm-dispatcher") */
-  def apply(llm: LlmPort, blockingEc: ExecutionContext): Behavior[Command] =
-    Behaviors.setup { context =>
-      given ExecutionContext = context.executionContext
-
-      Behaviors.receiveMessage:
-        case Run(prompt, workspace, outPath, model, timeoutS, replyTo) =>
-          val response = llm.runOneShot(prompt, workspace, model, timeoutS)(using blockingEc).map {
-            case Left(err) => Failed(err): Result
-            case Right(maybeText) =>
-              outPath match
-                case Some(path) if os.exists(path) =>
-                  Ok(0, Some(os.read(path)))
-                case Some(path) =>
-                  Failed(s"expected output at $path")
-                case None =>
-                  Ok(0, maybeText)
-          }
-
-          context.pipeToSelf(response) {
-            case Success(value) => Completed(value, replyTo)
-            case Failure(e)     => Completed(Failed(e.getMessage), replyTo)
-          }
-          Behaviors.same
-
-        case Completed(result, replyTo) =>
-          replyTo ! result
-          Behaviors.same
-    }
-end LlmBridge
-```
-
-**Production `LlmPort`** (sketch — runs on `blockingEc` only):
-
-```scala
-import scala.concurrent.{ExecutionContext, Future}
 import agents4s.cursor.CursorAgent
+import agents4s.pekko.LlmBridge
+import agents4s.prompt.PromptTemplate
 import agents4s.tmux.AgentConfig
 
-final class CursorAgentLlmPort extends LlmPort:
-  def runOneShot(prompt: String, workspace: os.Path, model: String, timeoutS: Double)(using
-      ec: ExecutionContext
-  ): Future[Either[String, Option[String]]] =
-    Future {
-      val agent =
-        new CursorAgent(workspace, model, oneShot = true, config = AgentConfig(quiet = true))
-      val code = agent.start(Some(prompt))
-      if code == 127 then Left("`agent` binary not on PATH")
-      else if code != 0 then Left(s"agent failed with exit code $code")
-      else Right(None)
-    }(using ec)
+final case class GatekeeperIn(workspace: os.Path, model: String, itemId: String)
+final case class GatekeeperOut(status: String, reason: Option[String])
+
+object GatekeeperBridge extends LlmBridge[GatekeeperIn, GatekeeperOut, CursorAgent]:
+
+  override def createAgent(in: GatekeeperIn): CursorAgent =
+    new CursorAgent(
+      in.workspace,
+      in.model,
+      oneShot = false,
+      config = AgentConfig(quiet = true),
+    )
+
+  override def buildPrompt(in: GatekeeperIn): String =
+    val out = outputPath(in)
+    PromptTemplate.load(
+      "gatekeeper.md",
+      Map(
+        "ITEM_ID" -> in.itemId,
+        "OUTPUT_JSON_PATH" -> out.toString,
+      ),
+    )
+
+  override def outputPath(in: GatekeeperIn): os.Path =
+    in.workspace / "out" / "gatekeeper.json"
+
+  override def parseOutput(raw: String): GatekeeperOut =
+    // e.g. ujson.read(raw) ...
+    GatekeeperOut("OK", None) // placeholder
 ```
 
-If the prompt instructs the model to write a file, pass **`readOutputPath = Some(...)`** in **`LlmBridge.Run`** and/or extend **`runOneShot`** to read that path inside the `Future`.
+Spawn with **`context.spawn(GatekeeperBridge.behavior(self), "gatekeeper")`** (or another **`ActorRef[GatekeeperOut]`**), then **`gatekeeper ! gatekeeperIn`**.
+
+---
+
+## Alternative: blocking `start(Some(prompt))` inside a `Future`
+
+If you are **not** using **`LlmBridge`**, you may still run **`CursorAgent.start(Some(prompt))`** on a **blocking dispatcher** and **`pipeToSelf`** the result — see [project-boilerplate.md](project-boilerplate.md) (`blocking-llm-dispatcher`). **Never** call **`start`/`sendPrompt`/`awaitDone`** on the actor default dispatcher.
 
 ---
 
 ## Timeouts
 
-Pass explicit **`timeoutS`** to **`awaitDone` / `awaitReady`** when you need faster failures than **`Agent.DefaultTimeoutS`**. On timeout, catch **`TimeoutException`** in the `Future` and map to **`Failed(...)`** — never leave **`replyTo`** without a response.
+Pass explicit **`timeoutS`** to **`awaitDone` / `awaitReady`** when using the blocking API. The heartbeat **`LlmBridge`** does not yet enforce a global timeout; add one in a later release or wrap the step at the parent actor if needed.
 
 ---
 
 ## Testing
 
-Unit tests **must not** start real **`CursorAgent`** sessions. Inject **`LlmPort`** as in [references/testing.md](references/testing.md).
+Unit tests **must not** attach to real tmux. Subclass **`CursorAgent`** (or **`TmuxAgent`**) with a **mock `Pane`**, override **`isReady` / `isBusy`** (and optionally **`start`**) to script the heartbeat sequence, as in **`agents4s.pekko.LlmBridgeSpec`** in the agents4s repo.
 
 Do **not** search the filesystem for the agents4s repo when implementing a harness — use this document and [project-boilerplate.md](project-boilerplate.md) only.

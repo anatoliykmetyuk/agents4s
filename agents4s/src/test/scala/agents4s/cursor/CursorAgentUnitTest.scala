@@ -118,6 +118,17 @@ class CursorAgentUnitTest extends AnyFunSuite with Matchers:
     pane.sendKeysCalls(1) shouldBe (("", true))
   }
 
+  test("firePrompt sends keys without awaiting busy") {
+    val tmp = tmpWorkspace
+    val agent = unitAgent(tmp, oneShot = false)
+    val pane = new MockPane(Seq(Seq(F)))
+    agent.pane = Some(pane)
+    agent.firePrompt("direct", promptAsFile = false)
+    pane.sendKeysCalls(0) shouldBe (("direct", false))
+    pane.sendKeysCalls(1) shouldBe (("", true))
+    pane.sendKeysCalls should have size 2
+  }
+
   test("sendPrompt as file creates temp and sends read instruction") {
     val tmp = tmpWorkspace
     val agent = unitAgent(tmp, oneShot = false)

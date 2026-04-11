@@ -6,5 +6,5 @@ if [[ "${1:-}" == -i || "${1:-}" == --integration ]]; then
   shift
   exec sbt clean coverage test coverageReport "$@"
 else
-  exec sbt clean coverage "testOnly agents4s.cursor.CursorTuiOpsTest agents4s.cursor.CursorAgentUnitTest agents4s.tmux.PathsTest agents4s.tmux.PaneTraitTest" coverageReport "$@"
+  exec sbt clean coverage "testOnly agents4s.cursor.CursorTuiOpsTest agents4s.cursor.CursorAgentUnitTest agents4s.tmux.PathsTest agents4s.tmux.PaneTraitTest agents4s.pekko.LlmBridgeSpec" coverageReport "$@"
 fi
