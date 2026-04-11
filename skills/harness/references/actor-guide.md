@@ -44,7 +44,7 @@ object WorkerA:
     Behaviors.setup { context =>
       Behaviors.receiveMessage {
         case InspectRequest(path, replyTo) =>
-          // mechanical work + maybe ask LlmBridge; then reply
+          // mechanical work + maybe spawn LLMActor child; then reply
           replyTo ! AlreadyDone
           Behaviors.same
         case InspectCompleted(response, replyTo) =>
@@ -92,9 +92,9 @@ def running(attemptsLeft: Int): Behavior[Command] =
 
 Keep retry count in **behavior parameters** or small immutable state class; on `Rejected` from a validator, spawn a new worker pass or resend message until cap — mirror the spec’s numeric limit.
 
-## Blocking and dispatchers
+## Agentic steps and blocking
 
-Do **not** block the actor thread on `CursorAgent` or disk-heavy loops. Offload blocking work to `Future` on a **blocking** dispatcher and use `pipeToSelf` (see [llm-bridge-guide.md](llm-bridge-guide.md)).
+Do **not** call **`agent.awaitIdle`**, **`agent.start`**, or **`agent.sendPrompt`** directly from the parent actor’s **`receiveMessage`** thread. For LLM-backed steps, **spawn** **`LLMActor.start[O](...)`** as a child (see [llm-actor-guide.md](llm-actor-guide.md)); it uses a heartbeat timer and keeps polling **`agent.isBusy`** off the parent mailbox. For heavy **mechanical** IO, use **`Future`** + **`pipeToSelf`** on an appropriate dispatcher if needed — that is separate from the LLM path.
 
 ## Lifecycle (optional)
 

@@ -4,17 +4,17 @@ Actor-system harnesses should stay **fast and deterministic** in CI: no real **`
 
 ## Principles
 
-1. **Unit tests:** `ActorTestKit`, `BehaviorTestKit`, `TestProbe`; **mock** the LLM port.
-2. **Integration tests (optional):** separate suite, gated by env var if you ever drive a real agent—same pattern as agents4s integration tests.
+1. **Unit tests:** `ActorTestKit`, `BehaviorTestKit`, `TestProbe`; stub **`agents4s.Agent`** (see below).
+2. **Integration tests (optional):** separate suite, gated by env var if you drive a real agent — same pattern as **`LLMActorIntegrationSpec`** in **`agents4s-pekko`**.
 3. **Real filesystem** under `Files.createTempDirectory` / `java.nio.file.Path` when testing file workflows.
-4. **Thin seams:** define a small `LlmPort` (or pass a stub `Behavior`) so production uses `LlmBridge` + `CursorAgent` and tests return canned results.
+4. **Thin seam:** production uses **`CursorAgent`** + **`LLMActor.start`**; tests use a **`StubAgent`** (or local test double) implementing **`Agent`**.
 
 ## Layers
 
 | Layer | Focus | Typical asserts |
 |-------|--------|-----------------|
 | Companion messages | `ActorName.Message` constructors | Equality, reply-to field present |
-| Pure helpers | JSON parsing, path rules | Outputs for inputs |
+| Pure helpers | Path rules, pure parsing | Outputs for inputs |
 | Actor unit | `BehaviorTestKit` / `TestProbe` | Messages sent, state transitions |
 | Multi-actor | `ActorTestKit` + probes | Parent spawns child; retries capped |
 
@@ -26,7 +26,7 @@ Actor-system harnesses should stay **fast and deterministic** in CI: no real **`
   src/test/scala/<pkg>/
     OrchestratorTest.scala
     WorkerATest.scala
-    LlmBridgeTest.scala        # optional, with stub only
+    LLMActorStepTest.scala   # optional: StubAgent + LLMActor.start
 ```
 
 Use **`scripts/test.sh`** (runs from project root; see [project-boilerplate.md](project-boilerplate.md)).
@@ -38,67 +38,113 @@ Use **`scripts/test.sh`** (runs from project root; see [project-boilerplate.md](
 | Sync test of `Behavior` | `BehaviorTestKit` with a single actor under test |
 | Async interaction | `TestProbe[A]` as `replyTo`; `probe.expectMessage` |
 | Child spawned | Parent factory takes `spawn` hook or use `ActorTestKit` `spawn` |
-| Blocking LLM | Never call real `CursorAgent`—inject `LlmPort` returning `Future.successful(...)` |
+| LLM step | Spawn **`LLMActor.start[O]`** with a **`StubAgent`**; in **`onSendPrompt`**, when the prompt contains the result-path cue (`"following path:"`), write valid JSON for **`O`** to that path (see [llm-actor-guide.md](llm-actor-guide.md)) |
 
-## Mock `LlmPort` + `LlmBridge` (concrete)
+## Stub `Agent` + `LLMActor` (concrete)
 
-Match the **`LlmPort`** shape from [llm-bridge-guide.md](llm-bridge-guide.md). Production uses **`CursorAgentLlmPort`**; tests use a stub that never touches tmux:
-
-```scala
-import scala.concurrent.{ExecutionContext, Future}
-
-final class MockLlmPort(
-    result: Either[String, Option[String]] = Right(Some("{\"status\":\"OK\"}"))
-) extends LlmPort:
-  def runOneShot(prompt: String, workspace: java.nio.file.Path, model: String, timeoutS: Double)(using
-      ec: ExecutionContext
-  ): Future[Either[String, Option[String]]] =
-    Future.successful(result)
-```
-
-**Actor test** (ScalaTest + `ActorTestKit`): spawn **`LlmBridge`** with the mock and assert on **`replyTo`**. Use the same **`blocking-llm-dispatcher`** from `application.conf` as production so behavior matches.
+**`StubAgent`** is not published on the main classpath — copy it from **`agents4s-pekko`** test sources (`agents4s-pekko/src/test/scala/agents4s/pekko/StubAgent.scala`) into your harness under e.g. **`src/test/scala/.../StubAgent.scala`**, or paste the class below. **`busyPhases`** controls how many heartbeat ticks **`isBusy`** returns true after each **`sendPrompt`**.
 
 ```scala
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
-import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import org.apache.pekko.actor.typed.DispatcherSelector
-import org.scalatest.wordspec.AnyWordSpec
+import scala.concurrent.duration.*
 
-class LlmBridgeTest extends ScalaTestWithActorTestKit with AnyWordSpec:
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 
-  private def blockingEc =
-    system.dispatchers.lookup(DispatcherSelector.fromConfig("blocking-llm-dispatcher"))
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-  private def tmpWorkspace: java.nio.file.Path = Files.createTempDirectory("llm-bridge-test")
+import agents4s.Agent
+import agents4s.pekko.LLMActor
 
-  "LlmBridge" should {
-    "reply Ok when the port succeeds" in {
-      val probe = createTestProbe[LlmBridge.Result]()
-      val ws = tmpWorkspace
-      val bridge = spawn(LlmBridge(new MockLlmPort(Right(Some("artifact"))), blockingEc))
-      bridge ! LlmBridge.Run(
-        promptMarkdown = "ignored-by-mock",
-        workspace = ws,
-        readOutputPath = None,
-        model = "noop",
-        timeoutS = 30 * 60,
-        replyTo = probe.ref
+import upickle.default.*
+import upickle.jsonschema.*
+
+/** Copy into src/test; mirrors agents4s-pekko test support. */
+final class StubAgent(
+    val workspace: java.nio.file.Path,
+    val model: String = "stub-model",
+    busyPhases: List[Int] = List(0, 0),
+    onSendPrompt: String => Unit = _ => ()
+) extends Agent:
+
+  private var phaseIdx = 0
+  private var busyRemaining: Int = busyPhases.headOption.getOrElse(0)
+  @volatile private var started = false
+
+  override def start(): Unit =
+    started = true
+    phaseIdx = 0
+    busyRemaining = busyPhases.lift(0).getOrElse(0)
+
+  override def stop(): Unit =
+    started = false
+
+  override def sendPrompt(text: String, promptAsFile: Boolean): Unit =
+    if !started then throw new RuntimeException("StubAgent is not started; call start() first")
+    if busyRemaining > 0 then
+      throw new RuntimeException("StubAgent is busy; wait for idle before sendPrompt")
+    onSendPrompt(text)
+    phaseIdx += 1
+    busyRemaining = busyPhases.lift(phaseIdx).getOrElse(0)
+
+  override def isStarted: Boolean = started
+
+  override def isBusy: Boolean =
+    if !started then throw new RuntimeException("StubAgent is not started; call start() first")
+    if busyRemaining > 0 then
+      busyRemaining -= 1
+      true
+    else false
+
+class GatekeeperLlmStepTest extends AnyFunSuite with Matchers:
+
+  case class GatekeeperOut(status: String, reason: Option[String]) derives ReadWriter
+  given JsonSchema[GatekeeperOut] = JsonSchema.derived
+
+  private val jsonPathPattern = java.util.regex.Pattern.compile(
+    "following path:\\s*(.+)\\s*",
+    java.util.regex.Pattern.MULTILINE
+  )
+
+  private def extractJsonPath(prompt: String): java.nio.file.Path =
+    val m = jsonPathPattern.matcher(prompt)
+    m.find() shouldBe true
+    java.nio.file.Path.of(m.group(1).trim)
+
+  test("LLMActor returns parsed output with StubAgent") {
+    val kit = ActorTestKit()
+    try
+      val ws = Files.createTempDirectory("gatekeeper-test")
+      val stub = new StubAgent(
+        ws,
+        busyPhases = List(0, 0),
+        onSendPrompt = p =>
+          if p.contains("following path:") then
+            val path = extractJsonPath(p)
+            Files.writeString(
+              path,
+              """{"status":"OK","reason":null}""",
+              StandardCharsets.UTF_8
+            )
       )
-      probe.expectMessage(LlmBridge.Ok(0, Some("artifact")))
-    }
-
-    "reply Failed when the port returns Left" in {
-      val probe = createTestProbe[LlmBridge.Result]()
-      val ws = tmpWorkspace
-      val bridge = spawn(LlmBridge(new MockLlmPort(Left("boom")), blockingEc))
-      bridge ! LlmBridge.Run("p", ws, None, "m", 30 * 60, probe.ref)
-      probe.expectMessage(LlmBridge.Failed("boom"))
-    }
+      val probe = kit.createTestProbe[GatekeeperOut | LLMActor.LLMError]()
+      val child = kit.spawn(
+        LLMActor.start[GatekeeperOut](
+          probe.ref,
+          stub,
+          "task body",
+          "status is OK | NEEDS_WORK | BLOCKED; reason optional"
+        )
+      )
+      probe.expectMessage(30.seconds, GatekeeperOut("OK", None))
+      probe.expectTerminated(child, 5.seconds)
+    finally kit.shutdownTestKit()
   }
 ```
 
-If you don’t load **`application.conf`** in tests, either merge a `application-test.conf` that defines **`blocking-llm-dispatcher`**, or inject a harmless **`ExecutionContext`** (e.g. `system.dispatchers.lookup(DispatcherSelector.default())`) **only** when the mock always returns `Future.successful` and never blocks—prefer aligning test config with prod.
+No **`blocking-llm-dispatcher`** is required for this pattern.
 
 ## Shared fixtures
 

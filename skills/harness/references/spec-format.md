@@ -48,7 +48,7 @@ What this actor is responsible for in one short paragraph.
 Numbered steps the actor follows when handling a message. Mark:
 
 - **Mechanical** steps: filesystem, git, parsing, calls to pure Scala — implement in the `Behavior`.
-- **Agentic** steps: judgment, code review, LLM-backed work — implement via `LlmBridge` + a file under `prompts/`, with a strict machine-readable output format (usually JSON) for the bridge to parse.
+- **Agentic** steps: judgment, code review, LLM-backed work — implement by spawning **`agents4s.pekko.LLMActor`** with a task prompt (often from `prompts/*.md` via **`PromptTemplate`**) and an **`outputInstructions`** string for the typed JSON result; define a case class **`O`** with uPickle **`ReadWriter`** + **`JsonSchema`** (see [llm-actor-guide.md](llm-actor-guide.md)).
 
 ### Subactors
 
