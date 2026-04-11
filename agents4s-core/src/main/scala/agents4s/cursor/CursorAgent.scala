@@ -12,27 +12,29 @@ class CursorAgent(
     val label: String = "agent"
 ) extends TmuxAgent:
 
+  private var _started: Boolean = false
+
   val startCommand: Seq[String] =
     Seq("agent", "--yolo", "--model", model, "--workspace", workspace.toString)
 
-  override def isStarted: Boolean = pane != null
+  override def start(): Unit =
+    super.start()
+    CursorTuiOps.awaitReady(pane)
+    _started = true
+
+  override def stop(): Unit =
+    _started = false
+    super.stop()
+
+  override def isStarted: Boolean = _started
 
   def isTrustPrompt: Boolean =
-    if !isStarted then
+    if pane == null then
       throw new RuntimeException(s"${getClass.getSimpleName} is not started; call start() first")
     CursorTuiOps.isTrustPrompt(CursorTuiOps.tailText(pane, nLines = 20))
 
-  override def isIdle: Boolean =
-    if !isStarted then false
-    else
-      val text = CursorTuiOps.tailText(pane, nLines = 20)
-      if CursorTuiOps.isTrustPrompt(text) then
-        pane.sendKeys("a", enter = false)
-        false
-      else CursorTuiOps.isReady(text)
-
   override def isBusy: Boolean =
-    if !isStarted then
+    if pane == null then
       throw new RuntimeException(s"${getClass.getSimpleName} is not started; call start() first")
     CursorTuiOps.isBusy(CursorTuiOps.tailText(pane, nLines = 20))
 

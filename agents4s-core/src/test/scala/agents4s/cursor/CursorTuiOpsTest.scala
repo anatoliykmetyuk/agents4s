@@ -88,6 +88,14 @@ class CursorTuiOpsTest
     val pane = new MockPane(trustLines :+ Seq(F))
     CursorTuiOps.awaitReady(pane, timeoutS = 5.0, pollIntervalMs = 0)
     pane.sendKeysCalls.toSeq should contain(("a", false))
+    pane.sendKeysCalls.count(_ == ("a", false)) shouldBe 1
+  }
+
+  test("R4b awaitReady long trust phase still sends exactly one a") {
+    val trustLines = (1 to 50).map(_ => Seq(T)).toSeq
+    val pane = new MockPane(trustLines :+ Seq(F))
+    CursorTuiOps.awaitReady(pane, timeoutS = 5.0, pollIntervalMs = 0)
+    pane.sendKeysCalls.count(_ == ("a", false)) shouldBe 1
   }
 
   test("R5 awaitReady never ready timeout") {
