@@ -98,15 +98,15 @@ Actor-spec harnesses use **`specs/messages.md`** as the **canonical** definition
 ```
 my-harness/
 ├── specs/
-│   └── messages.md        # full message signatures & ADTs (source for messages.scala)
+│   └── <spec-files>.md
 ├── scripts/
 ├── src/main/scala/<pkg>/
-│   ├── messages.scala         # shared protocol types (from specs/messages.md)
+│   ├── messages.scala         # shared message protocol types
 │   ├── Main.scala
-│   ├── GetItPassing.scala
-│   └── getitpassing/          # optional per-actor package
-│       ├── GetItPassing.scala
-│       └── helpers.scala
+│   └── actor1/                # per-actor package
+│       ├── Actor1.scala
+|       ├── Actor1Main.scala   # standalone main object to test this Actor all by itself
+│       └── helpers1.scala
 ├── src/main/resources/
 │   ├── application.conf
 │   └── prompts/               # task templates — classpath (PromptTemplate loads prompts/<file>)

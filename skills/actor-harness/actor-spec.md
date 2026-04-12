@@ -10,11 +10,11 @@ The following files are output by this workflow:
 - _The Definitions File_ - default `definitions.md`, may be overriden by the user - is the single source of truth for all project-specific defined terms.
 - _Actor Spec Files_ - default `01-actor-<actor-name-kebab-case>.md`, may be overriden by the user - are markdown files that contain the specification of Pekko Typed actors, one file per actor.
 
-Each actor spec is at most 100 lines. You must use precise language with zero omissions, zero generalizations, zero ambiguity. If you are using a project-specific term, it must be defined in the _Definitions File_. If you are mentioning a message, it must be defined in the _Messages File_.
-
 ## The Actor Specification Format
 
-The Actor Specification is a markdown file that contains the specification of a Pekko Typed actor. It is structured as follows:
+The Actor Specification is a markdown file that contains the specification of a Pekko Typed actor. Each actor spec is at most 100 lines. You must use precise language with zero omissions, zero generalizations, zero ambiguity. If you are using a project-specific term, it must be defined in the _Definitions File_. If you are mentioning a message, it must be defined in the _Messages File_.
+
+It is structured as follows:
 
 ```markdown
 # <Actor Name> Actor Specification
@@ -27,10 +27,13 @@ One paragraph describing the purpose of the actor.
 
 - `MessageName`
 - `AnotherMessage`
+...
 
 ## Workflow
 
-A numbered, nested list of steps describing the workflow of the actor.
+1. Step 1
+2. Step 2
+...
 ```
 
 The following are the rules you should follow for each section:
