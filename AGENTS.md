@@ -59,7 +59,7 @@ CI runs coverage with `CURSOR_DRIVER_INTEGRATION=0` on the required build job (i
 The **actor-harness** skill turns a **`specs/`** directory (**actor-spec** markdown: `# <Actor Name> Actor Specification`) into a **Scala 3 Apache Pekko Typed** project you can run with sbt.
 
 - **Hybrid workflow:** rote steps are **Scala** in actor behaviors; judgment-heavy steps use **`agents4s.cursor.CursorAgent`** via **`agents4s.pekko.LLMActor`** (heartbeat-driven child actor, not the parent dispatcher).
-- **Message layout:** canonical definitions in **`specs/messages.md`**; generated **`messages.scala`** holds all protocol types; each actor spec lists **message names only** under **`### Receives`**; each **`object ActorName`** has **`AcceptedMessages`** as **Scala 3 union types** (`Message1 | Message2 | …`) plus internal/LLM completions.
+- **Message layout:** canonical definitions in **`specs/messages.md`**; generated **`messages.scala`** holds all protocol types; each actor spec lists **message names only** under **`## Receives`**; each **`object ActorName`** has **`AcceptedMessages`** as **Scala 3 union types** (`Message1 | Message2 | …`) plus internal/LLM completions.
 - **Traceability:** add `// Spec: specs/…` in generated Scala to point at the source actor specification.
 - **Project shape:** generated harnesses use **`scripts/setup.sh`**, **`scripts/run.sh`**, **`scripts/test.sh`** (repo root), **`src/main/resources/prompts/`** for agentic templates (classpath-loaded via **`PromptTemplate`**), and **`skills/actor-harness/references/`** (`project-boilerplate.md`, `actor-translation-guide.md`, `library-api.md`, `testing.md`). Pair with **`skills/actor-spec/`** for writing specs.
 

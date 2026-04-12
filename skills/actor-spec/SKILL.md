@@ -4,7 +4,7 @@ description: >
   Create a markdown actor specification from the user prompt. Edit existing
   actor specifications to conform to the best practices outlined in this skill.
   Protocol messages are defined in specs/messages.md; each actor spec lists
-  message names only under ### Receives. Use this skill whenever the user asks
+  message names only under ## Receives. Use this skill whenever the user asks
   to write, create, draft, or edit an actor spec, agent spec, or actor
   specification; when they want to define a new actor, add an actor to specs/,
   describe an actor's messages and workflow, or convert a rough description of
@@ -19,14 +19,31 @@ You turn the user prompt into a markdown actor specification — the specificati
 
 ## Why these specs matter
 
-These specifications are the primary input to the **actor-harness** skill, which generates **`messages.scala`** from **`specs/messages.md`** and builds each actor’s **`AcceptedMessages`** from that actor’s **`### Receives`** name list. Workflow steps can say **reply with \`MessageName(...)\`** without naming the recipient actor: the recipient must list that message name under **`### Receives`**, and the full type comes from **`messages.md`**. A well-written spec produces a clean actor with minimal manual fixup.
+These specifications are the primary input to the **actor-harness** skill, which generates **`messages.scala`** from **`specs/messages.md`** and builds each actor’s **`AcceptedMessages`** from that actor’s **`## Receives`** name list. Workflow steps that **send** a message must **name the recipient explicitly** (see **Replies** below). The harness and human readers must never infer who receives an outbound message. A well-written spec produces a clean actor with minimal manual fixup.
 
 ## Suite layout: `messages.md` + actor specs
 
 - **`specs/messages.md`** — **Single source of truth** for all inter-actor messages: pseudocode signatures, payloads, glosses, shared ADTs. The harness turns this into **`messages.scala`**.
-- **Each actor spec** — **`## Messaging Protocol` → `### Receives`** lists **only message names** (backticks, one bullet per name). No payloads or descriptions here — those live in **`messages.md`** only.
+- **Each actor spec** — **`## Suite references`** links **`messages.md`** (and **`definitions.md`** when used); **`## Receives`** lists **only message names** (backticks, one bullet per name). No payloads or descriptions under Receives — those live in **`messages.md`** only.
 
-When you add or change a message, update **`messages.md`** and ensure every actor that can receive it includes that name in **`### Receives`**.
+When you add or change a message, update **`messages.md`** and ensure every actor that can receive it includes that name in **`## Receives`**.
+
+## Precision and conciseness (non-negotiable)
+
+Each actor spec is **at most 100 lines**. Within that budget: **zero omissions, zero generalizations, zero ambiguity**. Brevity means cutting filler, **not** cutting required detail.
+
+- Every workflow step that **sends a message** names the **recipient explicitly** (see **Replies**).
+- Every **subagent spawn** states what the child **does**, which **reply messages** the parent may get back, and what the parent **does on each reply** (including explicit **reply to \`replyTo\`** or **tell [...]** when the parent sends onward).
+- Every **conditional** (success vs failure, branch A vs B) is written out; do not leave one path implicit.
+- If a reader could ask “who receives this?” or “what happens next?”, the spec is incomplete.
+
+## Messages are for inter-actor communication only
+
+Put a message in **`messages.md`** only when a **different actor** (or the same actor via a **scheduled timer / delay**) sends or receives that envelope across a boundary.
+
+- **Do not** invent messages for internal steps one actor performs in a single stretch of work (intermediate validation results, “emit to self” to sequence file moves, private state transitions). Those belong in the **Workflow** as imperative steps.
+- **Allowed self-message:** schedule a message **to self** for delay, backoff, or periodic tick when the system model requires it (e.g. after a `scala.concurrent.duration.FiniteDuration`).
+- **Rule of thumb:** before adding a message, ask: *which actor sends this* and *which actor receives it*? If only **this** actor is both sender and receiver (except timer wake-ups), it is **not** a protocol message — make it a workflow step.
 
 ## The actor specification format
 
@@ -35,18 +52,14 @@ When you add or change a message, update **`messages.md`** and ensure every acto
 
 ## Actor Purpose
 
-The purpose of the actor.
+The purpose of the actor (high-level only; see “Actor Purpose” rules below).
 
-## Definitions
+## Suite references
 
-- _Term A_: what it names (path, branch, threshold, …).
-- _Term B_: …
+- [`specs/messages.md`](specs/messages.md) — full message signatures and payloads for this harness.
+- [`specs/definitions.md`](specs/definitions.md) — glossary for `_Term_` used in this spec (omit if unused).
 
-(If the suite uses a **shared definitions file** instead, see “Definitions” rules below — you may cite that file and omit the bullet list here.)
-
-## Messaging Protocol
-
-### Receives
+## Receives
 
 - `MessageName`
 - `AnotherMessage`
@@ -56,27 +69,31 @@ The purpose of the actor.
 A numbered, nested list of steps describing the workflow of the actor.
 ```
 
-Each **`### Receives`** line is **only** `` `MessageName` `` — the name must match a message defined in **`specs/messages.md`**.
+Each **`## Receives`** line is **only** `` `MessageName` `` — the name must match a message defined in **`specs/messages.md`**.
 
-The specification should always start with the header `# <Actor Name> Actor Specification`. The purpose should be a single paragraph describing the actor's purpose. Write in second person ("Your purpose is to...") — these specs read as instructions to the actor, and the second-person voice makes intent unambiguous both for human readers and for LLM agents that may implement the actor's agentic steps.
+The specification should always start with the header `# <Actor Name> Actor Specification`. **Actor Purpose** is a **short, high-level** paragraph: what this actor is for in plain language — **no links, no “Definition source” lines, no file paths.**
 
-### Definitions (required coverage, not always a long section in this file)
+**`## Suite references`** (after Purpose, before **`## Receives`**) is where **all** pointers to suite files belong: at minimum **`specs/messages.md`**, and **`specs/definitions.md`** (or your suite’s glossary path) when the harness uses a shared definitions file or any actor in the suite points at one. Do **not** scatter those links through Purpose or Workflow.
+
+**`## Workflow`** may name message types and payloads in prose and use markdown links for **Spawn the Subagent [Name](path-to-actor-spec.md)** (and similar routing to **peer actor specs**). Do **not** put markdown links to **`messages.md`**, **`definitions.md`**, or other **catalog / glossary** files inside Workflow steps — readers use **`## Suite references`** for those.
+
+Write in second person ("Your purpose is to...") — these specs read as instructions to the actor, and the second-person voice makes intent unambiguous both for human readers and for LLM agents that may implement the actor's agentic steps.
+
+### Definitions (required coverage, not always a section in each actor file)
 
 Use **underscore italics** (`_Term_`) **only** for **project-specific defined terms** — not for generic emphasis, and **not** for message payload field names (write those in backticks: `pullRequestNumber`, `destination`, `publicUrl`) so they are not confused with terms that belong in **Definitions**.
 
 **Where definitions live**
 
-Every `_Term_` in **Actor Purpose**, **Messaging Protocol** (message names in **`### Receives`** do not need definitions — full shapes are in **`messages.md`**), or **Workflow** must be **defined somewhere readers can find**. Use **one** of these patterns:
+Every `_Term_` in **Actor Purpose** or **Workflow** must be **defined somewhere readers can find**. (Message names under **`## Receives`** do not need definitions — full shapes are in **`messages.md`**.) Use **one** of these patterns:
 
-1. **Inline (default)** — `## Definitions` **immediately after** `## Actor Purpose` and **before** `## Messaging Protocol**, with one bullet per term: `- _Same Spelling_: short gloss`.
+1. **Suite definitions file (preferred when the harness has multiple actor specs)** — one shared file (e.g. `specs/definitions.md`) with every `_Term_` used in any actor in the suite. List it under **`## Suite references`** in **every** actor spec that belongs to that suite (same path for all). Keep that file **complete** for every term used in any citing spec.
 
-2. **Suite definitions file** — when **either** the user tells you a path for definitions (create or update that file as needed) **or** you **discover** an existing definitions file in the `specs/` tree (e.g. `specs/definitions.md`, `specs/DEFINITIONS.md`, `specs/glossary.md`, or a name the project already uses). Then you **may omit** the full `## Definitions` bullet list **from this actor file**. Instead, **end `## Actor Purpose`** with a short, explicit pointer — for example:  
-   `**Definition source:** all `_Term_` below are defined in [`specs/definitions.md`](specs/definitions.md).`  
-   Keep that shared file **complete**: every italic term used in **any** actor spec that points at it must appear there with a gloss.
+2. **Inline** — `## Definitions` **immediately after** `## Suite references` and **before** `## Receives`, with one bullet per term: `- _Same Spelling_: short gloss`.
 
-If there are **no** project-specific `_Term_` italics in those sections, you **omit** `## Definitions` and any definition-source line.
+If there are **no** project-specific `_Term_` italics in Purpose or Workflow, you **omit** `## Definitions` and the definitions bullet under **`## Suite references`** (still keep **`specs/messages.md`** under Suite references when this actor is part of a protocol suite).
 
-**Subagent specs** follow the same rule: inline `## Definitions`, or the same suite file + pointer in Purpose, per file.
+**Subagent specs** follow the same rule: shared suite file listed under **`## Suite references`**, or inline `## Definitions`, per file.
 
 If the user later moves to inline definitions only, restore a full `## Definitions` section in each affected spec and trim redundant pointers.
 
@@ -124,12 +141,12 @@ That is: a leading `- `, the pseudocode signature in backticks, then **space, hy
 
 Do **not** put the gloss on the following line or indent it under the signature. Do **not** use an em dash between signature and gloss — use **ASCII hyphen** ` - `.
 
-## Messaging Protocol (actor spec)
+## Receives (actor spec)
 
-Under **`### Receives`**, list **only** message **names** that this actor’s mailbox accepts — each as a single line:
+Under **`## Receives`**, list **only** message **names** that this actor’s mailbox accepts — each as a single line:
 
 ```markdown
-### Receives
+## Receives
 
 - `PortPluginRequest`
 - `GatekeeperOutcome`
@@ -137,7 +154,9 @@ Under **`### Receives`**, list **only** message **names** that this actor’s ma
 
 Every name must appear in **`specs/messages.md`** with the full signature. Include messages from external callers, **child** actors, and peers.
 
-**Do not** add `### Sends`. Replies use message types defined in **`messages.md`**; the receiving actor lists that message name under **`### Receives`**.
+**Do not** add a separate “Sends” section. Replies use message types defined in **`messages.md`**; the receiving actor lists that message name under **`## Receives`**.
+
+**`## Suite references`** must appear **after** **`## Actor Purpose`** and **before** **`## Receives`** whenever this actor is part of a harness that uses **`specs/messages.md`**. Use it for links to the message catalog and shared glossary only — not for links to peer actor specs (those stay in **Workflow** spawn lines).
 
 ## Workflow
 
@@ -147,32 +166,59 @@ Each step of the workflow should be chunked and scoped to the purpose of the act
 
 ### Workflow patterns
 
-The following patterns appear frequently in well-written workflows. Read [examples/01-0-actor-get-it-passing.md](examples/01-0-actor-get-it-passing.md) and [examples/messages.md](examples/messages.md) for a complete illustration.
+The following patterns appear frequently in well-written workflows. Read [examples/02-actor-get-it-passing.md](examples/02-actor-get-it-passing.md), [examples/01-messages.md](examples/01-messages.md), and [examples/06-definitions.md](examples/06-definitions.md) for a complete illustration.
 
-**Defined terms.** Mark project-specific concepts with `_Term_` and ensure **every such term** is listed either in this file’s `## Definitions` or in the **suite definitions file** you cite at the end of Actor Purpose (see above).
+**Defined terms.** Mark project-specific concepts with `_Term_` and ensure **every such term** is listed either in this file’s `## Definitions` or in the **suite definitions file** linked under **`## Suite references`** (see above).
 
 **Concrete commands.** When a step involves a specific shell command, include it inline in backticks.
 
 **Conditional branching.** When a step has different outcomes, spell out each branch explicitly.
 
-**Replies.** To send a reply, name the message and payload as in **`messages.md`**, e.g. **reply with \`Blocked(reasons)\`** or **tell \`replyTo\` with \`PortingComplete(reports)\`**. You do **not** need to link the recipient actor — the recipient’s **`### Receives`** must include that message name; the harness resolves the full type from **`messages.md`**.
+**Replies and tells — recipients must be explicit.** Do **not** use **“emit”**, **“send”**, or bare **“reply with \`Message(...)\`”** without naming who receives the message. Every outbound message in the workflow uses **exactly one** of:
+
+1. **`reply to \`replyTo\` with \`Message(...)\`**` — use the **`replyTo`** (or equivalent) **field name** from the **incoming request** in **`messages.md`** (if the catalog uses `sender`, `clientRef`, etc., use that exact name in the prose).
+2. **`tell [Actor Name](path/to/spec.md) with \`Message(...)\`**` — markdown link to the receiving actor’s spec; use when the recipient is not the original requester.
+
+**Forbidden in workflow text:** “Emit \`Foo\`”, “Send \`Foo\`”, “Reply with \`Foo\`” with no recipient named in the same step.
+
+**Good / bad**
+
+- BAD: Emit \`BatchItemFailed\` for that image.
+- BAD: Reply with \`BatchItemFailed(jobId, image, lastError)\` and end. *(Who receives it?)*
+- GOOD: Reply to \`replyTo\` with \`BatchItemFailed(jobId, image, lastError)\` and continue with remaining images.
+- GOOD: Tell [Port Plugin Client](specs/port-plugin-client.md) with \`Blocked(reasons)\` and end.
+
+Conciseness is **not** an excuse to omit the recipient: *“Reply to \`replyTo\` with \`Blocked(reasons)\` and end”* is short and unambiguous.
+
+**Child replies:** When a **child** answers with a message listed under your **`## Receives`** (e.g. \`GatekeeperOutcome\`), branch in the workflow on that type. Any **final outcome to the original client** still uses **reply to \`replyTo\` with \`...\`** when the request carried \`replyTo\`.
 
 **Bounded loops.** When a step can be retried, state the bound: "go back to step 6... It is possible to return to step 6 no more than 3 times." Without an explicit bound, the actor-harness skill cannot know when to give up.
 
-**Agentic steps.** When a step is meant to be carried out by an **LLM agent** (judgment, natural-language reasoning, or tool use that is not pure deterministic code), start the step text with **`(Agentic Step)`** so the actor-harness skill can route it to agentic execution (e.g. `LLMActor`). Subagent delegation often implies an agentic child, but the marker applies to **this** actor’s step: use it when **this** step’s work is agentic (including “spawn subagent and interpret its reply” when that interpretation is non-mechanical). Purely deterministic steps (fixed shell commands, file moves, simple conditionals on structured data) do not need the marker.
+**Agentic steps.** Use **`(Agentic Step)`** only when **this** actor’s step is an **LLM call driven by a prompt** (judgment, natural-language reasoning, summarization, classification, or tool use mediated by the model). The harness routes those steps to agentic execution (e.g. `LLMActor`). **Do not** mark **Spawn the Subagent** as agentic: spawning a typed child and waiting on its **structured** reply is normal orchestration, not an LLM prompt on the parent. If the **child** is an LLM-backed actor, the **`(Agentic Step)`** markers belong in **that** child’s spec, on the steps where **it** runs prompts — not on the parent’s spawn line.
 
-Example: `4. **(Agentic Step)** Spawn the Subagent [Reviewer](specs/reviewer.md) and, based on its structured reply, decide whether to post comments.`
+**Not agentic:** spawning children, `git` / shell commands, file moves, parsing structured data, branching on known message types. **Agentic:** e.g. “**(Agentic Step)** Call the LLM with prompt template `prompts/triage.txt` and the raw ticket text; map the model’s JSON output to \`TriageDecision(...)\`.”
 
-**Subagent delegation.** A workflow step may spawn a child actor to delegate work to it. An actor-spawning step follows the following pattern:
+**Subagent delegation.** A spawn step must make the **parent’s** protocol unambiguous:
+
+1. **What the child does** — one clause (capability in plain language), **not** a recap of which message types appear in the child’s **`## Receives`**.
+2. **Which reply messages** the parent may receive from that child (names matching **`messages.md`**).
+3. **Nested substeps** — one per distinct reply: exact next action, including **reply to \`replyTo\`** or **tell [...]** whenever the parent sends a message onward.
+
+**Bad:** *Spawn the Subagent [Resize Worker](resize-worker.md), which performs \`ResizeRequest\` / \`ResizeDone\` handling.* (Mailbox trivia; omits what the parent expects and does.)
+
+**Good:** *Spawn the Subagent [Resize Worker](resize-worker.md). It resizes the image to configured bounds and replies with \`ResizeDone\` on success or \`WorkerFailed\` on failure.*
+    1. On \`ResizeDone\`, proceed to the watermark stage.
+    2. On \`WorkerFailed\`, increment the retry counter for this stage (at most 2 retries); if exhausted, reply to \`replyTo\` with \`BatchItemFailed(jobId, image, lastError)\`.
+
+Template:
 
 ```markdown
-1. Spawn the Subagent [Subagent Name](path/to/subagent/specification.md), which does X.
-    1. Subagent response 1 handling
-    2. Subagent response 2 handling
-    3. Subagent response N handling
+1. Spawn the Subagent [Subagent Name](path/to/subagent/specification.md). It will <capability> and reply with `MessageA` / `MessageB` / … (names and shapes from the suite message catalog in Suite references).
+    1. On `MessageA`, <next step; if sending, use reply to `replyTo` or tell [Peer](peer.md)>.
+    2. On `MessageB`, <next step>.
 ```
 
-Subagent Name is the name of the subagent and the path is the path to the subagent's specification file relative to the specification folder. Defining a subagent step means you also need to define the specification of that subagent at the path specified. Do not specify the subagent's behavior, workflow or messaging protocol in the parent actor's specification. You may have one line describing at a high-level what the subagent does, however, all the specification should be contained in the subagent's specification file.
+Define the child’s full **`## Receives`**, **Workflow**, and any **Definitions** (inline or shared file) only in the **child** spec at the linked path. The **parent** must not copy the child’s internal steps, but **must** spell out how it reacts to **each** child reply.
 
 ## File Naming
 
@@ -180,13 +226,13 @@ Infer the naming convention from the existing files in the `specs/` folder or fr
 
 ## Rules for Writing Specifications
 
-- Keep each **actor** spec concise — no longer than 100 lines.
+- Keep each **actor** spec concise — no longer than 100 lines, and **every line must be precise** (no implied recipients, no hand-wavy “emit” or “send”).
 - Each actor should do one specific job. Split complex jobs into multiple actors.
-- Use precise language — avoid generalizations, omissions, ambiguity.
+- Use precise language — avoid generalizations, omissions, ambiguity; **precision and the line budget are both mandatory**.
 - Write in second person ("Your purpose is to...").
-- If you use `_Term_` in Actor Purpose or Workflow, either add `## Definitions` (after Purpose, before Messaging) with every term, **or** point to a shared definitions file under `specs/` at the end of Actor Purpose — no undefined italics.
-- **`### Receives`:** one bullet per message name in backticks only (e.g. `- `PortPluginRequest``) — no payloads; definitions live in **`messages.md`**.
-- Keep **`messages.md`** complete and consistent: every name listed in any actor’s **`### Receives`** has a full definition line in **`messages.md`**.
+- If you use `_Term_` in Actor Purpose or Workflow, either add `## Definitions` (after `## Suite references`, before `## Receives`) with every term, **or** link the shared definitions file under **`## Suite references`** — no undefined italics. Do **not** link **`messages.md`** or **`definitions.md`** from inside **Workflow** steps.
+- **`## Receives`:** one bullet per message name in backticks only (e.g. `- `PortPluginRequest``) — no payloads; full signatures live in **`messages.md`**.
+- Keep **`messages.md`** complete and consistent: every name listed in any actor’s **`## Receives`** has a full definition line in **`messages.md`**.
 
 ## Evals
 

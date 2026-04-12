@@ -20,7 +20,7 @@ description: >
 
 You turn **`specs/*.md`** files that follow the **actor-spec** format into a **runnable** Scala 3 project: **Pekko Typed** for structure, **`agents4s.pekko.LLMActor`** + **`agents4s.cursor.CursorAgent`** for **(Agentic Step)** workflow lines. Mechanical work stays in actor `Behavior`s; LLM work runs in a **child** **`LLMActor`** so the parent never blocks on tmux polling while the agent runs.
 
-**Input contract:** specs are written with the **actor-spec** skill. Canonical title: `# <Actor Name> Actor Specification`. Sections: **Actor Purpose**, optional **Definitions**, **Messaging Protocol** (**`### Receives`** — **message names only**, backticks, one per line), **Workflow**. **Full** message signatures live in **`specs/messages.md`**; the harness generates **`messages.scala`** from that file.
+**Input contract:** specs are written with the **actor-spec** skill. Canonical title: `# <Actor Name> Actor Specification`. Sections: **Actor Purpose**, **`## Suite references`** (links to **`specs/messages.md`** and optional shared **`specs/definitions.md`**), optional inline **`## Definitions`**, **`## Receives`** (**message names only**, backticks, one per line), **Workflow**. **Full** message signatures live in **`specs/messages.md`**; the harness generates **`messages.scala`** from that file.
 
 **Why this split:** actors give explicit message types, retries, and composition; **`LLMActor`** encapsulates the Cursor session, JSON result file, and uPickle parsing (see [references/library-api.md](references/library-api.md)). Shared protocol types live in **`messages.scala`**, sourced from **`specs/messages.md`** (see [references/actor-translation-guide.md](references/actor-translation-guide.md)).
 
@@ -61,16 +61,16 @@ Shell scripts live under **`scripts/`** and `cd` to the repo root before invokin
 1. Read **`specs/messages.md`** — this is the **single source of truth** for protocol message shapes. Generate or update **`messages.scala`** from it (one canonical Scala type per message in **`messages.md`**).
 2. Scan **`specs/`** (recursively if the project uses subfolders) for markdown files whose **first** `#` heading matches **`# <Actor Name> Actor Specification`** (any actor name). Those files are **actor specifications**; each maps to **exactly one** Scala `object` (name derived from `<Actor Name>` — PascalCase, no spaces).
 3. Other markdown (e.g. shared **Definitions** files, glossaries) is **supporting context**, not an actor — no `Behavior` for those files alone.
-4. For **each** actor spec, parse **`### Receives`**: each bullet is a **message name** only (e.g. `` `PortPluginRequest` ``). Build **`AcceptedMessages`** for that actor as the union of the corresponding types from **`messages.scala`** (plus internal-only types).
+4. For **each** actor spec, parse **`## Receives`**: each bullet is a **message name** only (e.g. `` `PortPluginRequest` ``). Build **`AcceptedMessages`** for that actor as the union of the corresponding types from **`messages.scala`** (plus internal-only types).
 5. Parse each actor spec’s **Workflow** for **subagent** lines: `Spawn the Subagent [Name](relative/path.md)`. Build a graph: parent → child spec paths. Ensure every linked child has its own actor spec file at that path (or scaffold stubs the user will fill).
-6. **Reply steps** in the Workflow name messages (e.g. **reply with \`Blocked(reasons)\`**). Resolve types from **`messages.scala`**; the receiving actor must list that message name under **`### Receives`** — no **`reply to [Actor](path)`** parsing required.
+6. **Reply steps** in the Workflow name messages (e.g. **reply with \`Blocked(reasons)\`**). Resolve types from **`messages.scala`**; the receiving actor must list that message name under **`## Receives`** — no **`reply to [Actor](path)`** parsing required.
 7. Add a **`// Spec: specs/....md`** line at the top of each generated actor `.scala` file for traceability (optional but recommended).
 
 ## Step 2 — Scaffold or extend the project
 
 For new projects, use [references/project-boilerplate.md](references/project-boilerplate.md): **`build.sbt`**, **`application.conf`**, **`scripts/*.sh`**, **`.gitignore`**, `out/`, **`specs/messages.md`**, **`messages.scala`**.
 
-For incremental adds: extend **`specs/messages.md`** and **`messages.scala`** with new message types; add **`### Receives`** names to affected actors; add new actor files + minimal edits to parents (spawn, routing, **`AcceptedMessages`** unions).
+For incremental adds: extend **`specs/messages.md`** and **`messages.scala`** with new message types; add **`## Receives`** names to affected actors; add new actor files + minimal edits to parents (spawn, routing, **`AcceptedMessages`** unions).
 
 ## Step 3 — One Scala object per actor specification + shared messages
 
@@ -79,7 +79,7 @@ For incremental adds: extend **`specs/messages.md`** and **`messages.scala`** wi
 2. For **each** actor spec:
 
 - **`object <ActorName>`** in **one primary `.scala` file** (see naming in Step 1).
-- **`type AcceptedMessages`:** union of all types **named** in **this** actor’s **`### Receives`** (resolved via **`messages.scala`**), **plus** private/internal types (timers, **`LLMActor`** / **`messageAdapter`** wiring) not named in the spec.
+- **`type AcceptedMessages`:** union of all types **named** in **this** actor’s **`## Receives`** (resolved via **`messages.scala`**), **plus** private/internal types (timers, **`LLMActor`** / **`messageAdapter`** wiring) not named in the spec.
 - **`Deps`**, **`def apply`**, behavior **`def`**s implementing the **Workflow**; **reply** steps use message types from **`messages.scala`** (e.g. **`req.replyTo ! Outcome(...)`**).
 
 Mechanical translation rules: [references/actor-translation-guide.md](references/actor-translation-guide.md).

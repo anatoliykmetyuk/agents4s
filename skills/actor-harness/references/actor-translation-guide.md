@@ -7,13 +7,13 @@ Use this when implementing **[skills/actor-harness/SKILL.md](../SKILL.md)** agai
 - Spec heading: `# Get It Passing Actor Specification`
 - Scala: `object GetItPassing` (PascalCase, strip “Actor Specification” from the title words — use the actor name phrase only).
 
-Add `// Spec: specs/01-0-actor-get-it-passing.md` (or actual path) at the top of each actor `.scala` file.
+Add `// Spec: specs/02-actor-get-it-passing.md` (or actual path) at the top of each actor `.scala` file.
 
 ## Spec format (actor-spec)
 
 - **`specs/messages.md`** — **canonical** definitions for **all** inter-actor messages: pseudocode signatures, payloads, glosses, shared ADTs. The harness generates **`messages.scala`** from this file (not by merging full bullets from each actor spec).
-- **Each actor spec → `## Messaging Protocol` → `### Receives`** — **name only**: one bullet per message type this actor accepts, e.g. `` - `PortPluginRequest` ``. **No** payloads or glosses in the actor file — those stay in **`messages.md`** only.
-- **Workflow** steps that **reply** name the message and payload as in **`messages.md`** (e.g. **reply with \`Blocked(reasons)\`**). You **do not** need **`reply to [Actor](path)`** links: the recipient actor lists that message name under **`### Receives`**; **`messages.scala`** supplies the full type.
+- **Each actor spec → `## Receives`** — **name only**: one bullet per message type this actor accepts, e.g. `` - `PortPluginRequest` ``. **No** payloads or glosses in the actor file — those stay in **`messages.md`** only.
+- **Workflow** steps that **reply** name the message and payload as in **`messages.md`** (e.g. **reply with \`Blocked(reasons)\`**). You **do not** need **`reply to [Actor](path)`** links: the recipient actor lists that message name under **`## Receives`**; **`messages.scala`** supplies the full type.
 
 ## `messages.scala` — shared protocol types
 
@@ -31,7 +31,7 @@ Inter-actor messages are defined **once** in **`specs/messages.md`** and compile
 
 Each **`object <ActorName>`** (in **`<ActorName>.scala`**) holds:
 
-- **`type AcceptedMessages`** — a **Scala 3 union** of every message **name** listed in **this** actor’s spec **`### Receives`** (resolve each name to the type in **`messages.scala`**) **plus** **private/internal** messages not named in the spec (timers, **`LLMActor`** / **`messageAdapter`** wiring).
+- **`type AcceptedMessages`** — a **Scala 3 union** of every message **name** listed in **this** actor’s spec **`## Receives`** (resolve each name to the type in **`messages.scala`**) **plus** **private/internal** messages not named in the spec (timers, **`LLMActor`** / **`messageAdapter`** wiring).
 - **`Deps`**, **`def apply`**, behavior **`def`**s.
 - **Private** implementation messages (e.g. `private case class RetryTick`, LLM completion wrappers) — **not** duplicated in **`messages.scala`** if they are truly internal.
 
@@ -47,14 +47,14 @@ type AcceptedMessages =
 
 **Include:**
 
-1. Every **`### Receives`** **name** for **this** actor (types from **`messages.scala`**).
+1. Every **`## Receives`** **name** for **this** actor (types from **`messages.scala`**).
 2. **Internal-only** types for **this** actor when needed.
 
 ## Workflow → `def` behaviors
 
 - **`def apply(deps): Behavior[AcceptedMessages]`** — entry; delegates to the first workflow phase.
 - **Numbered steps** map to **named methods**: e.g. `def awaitingGatekeeper(...): Behavior[AcceptedMessages]`.
-- **Replies:** when the spec says **reply with \`Foo(...)\`**, **`Foo`** must appear under **some** actor’s **`### Receives`** that will receive it; implement **`someActorRef ! Foo(...)`** (often **`req.replyTo`**) using the type from **`messages.scala`**. No markdown link to the recipient is required at spec level.
+- **Replies:** when the spec says **reply with \`Foo(...)\`**, **`Foo`** must appear under **some** actor’s **`## Receives`** that will receive it; implement **`someActorRef ! Foo(...)`** (often **`req.replyTo`**) using the type from **`messages.scala`**. No markdown link to the recipient is required at spec level.
 - **Nested list items** (1.1, 1.2) stay inline or in a **private def** if long.
 
 Example:
@@ -68,7 +68,7 @@ def awaitingGatekeeper(...): Behavior[AcceptedMessages] =
 
 ## `(Agentic Step)` and subagents
 
-- **`Spawn the Subagent [The Gatekeeper](01-1-actor-the-gatekeeper.md)`** → `context.spawn(TheGatekeeper(deps), "gatekeeper-...")`. **`tell`** the child using **receive** types from **`messages.scala`** that match **The Gatekeeper**’s spec (e.g. **`GatekeeperRequest`**). The parent’s **`AcceptedMessages`** includes whatever **this** actor **receives back** from that child (listed in **this** actor’s `### Receives` as names → types from **`messages.md`**).
+- **`Spawn the Subagent [The Gatekeeper](03-actor-the-gatekeeper.md)`** → `context.spawn(TheGatekeeper(deps), "gatekeeper-...")`. **`tell`** the child using **receive** types from **`messages.scala`** that match **The Gatekeeper**’s spec (e.g. **`GatekeeperRequest`**). The parent’s **`AcceptedMessages`** includes whatever **this** actor **receives back** from that child (listed in **this** actor’s `## Receives` as names → types from **`messages.md`**).
 - Subagent specs are separate files — **`object TheGatekeeper`** in **`TheGatekeeper.scala`** with **its own** **`AcceptedMessages`** (subset of **`messages.scala`** + internals).
 - Pure LLM on this actor (no child actor): **`LLMActor.start[O]`** per [library-api.md](library-api.md).
 
@@ -84,7 +84,7 @@ case class MyStepResult(answer: String, confidence: Option[Double]) derives Read
 given JsonSchema[MyStepResult] = JsonSchema.derived
 ```
 
-Keep **`O`** **next to** **`LLMActor`** usage (private to the actor object) **or** in a small internal block — it is **not** part of the markdown **`### Receives`** protocol unless you also list it in a spec. See [library-api.md](library-api.md) and [`LLMActorIntegrationSpec.scala`](../../../agents4s-pekko/src/test/scala/agents4s/pekko/LLMActorIntegrationSpec.scala).
+Keep **`O`** **next to** **`LLMActor`** usage (private to the actor object) **or** in a small internal block — it is **not** part of the markdown **`## Receives`** protocol unless you also list it in a spec. See [library-api.md](library-api.md) and [`LLMActorIntegrationSpec.scala`](../../../agents4s-pekko/src/test/scala/agents4s/pekko/LLMActorIntegrationSpec.scala).
 
 ## Bounded loops
 
@@ -107,7 +107,7 @@ If a workflow step needs **non-obvious** parsing, path logic, or orchestration:
 
 ## Worked example (structural sketch)
 
-**Specs:** **`specs/messages.md`** defines **`PortPluginRequest`**, **`AlreadyPorted`**, **`Blocked`**, **`GatekeeperOutcome`**, … in full. **Get It Passing** lists **`PortPluginRequest`**, **`GatekeeperOutcome`**, … under **`### Receives`** (names only). **Port Plugin Client** lists **`AlreadyPorted`**, **`Blocked`**, … (names only). **`messages.scala`** is the union of **all** messages from **`messages.md`**.
+**Specs:** **`specs/messages.md`** defines **`PortPluginRequest`**, **`AlreadyPorted`**, **`Blocked`**, **`GatekeeperOutcome`**, … in full. **Get It Passing** lists **`PortPluginRequest`**, **`GatekeeperOutcome`**, … under **`## Receives`** (names only). **Port Plugin Client** lists **`AlreadyPorted`**, **`Blocked`**, … (names only). **`messages.scala`** is the union of **all** messages from **`messages.md`**.
 
 **`messages.scala`** (abbreviated):
 
