@@ -11,19 +11,19 @@ Add `// Spec: specs/02-actor-get-it-passing.md` (or actual path) at the top of e
 
 ## Spec format (actor-spec)
 
-- **`specs/messages.md`** — **canonical** definitions for **all** inter-actor messages: pseudocode signatures, payloads, glosses, shared ADTs. The harness generates **`messages.scala`** from this file (not by merging full bullets from each actor spec).
-- **Each actor spec → `## Receives`** — **name only**: one bullet per message type this actor accepts, e.g. `` - `PortPluginRequest` ``. **No** payloads or glosses in the actor file — those stay in **`messages.md`** only.
-- **Workflow** steps that **reply** name the message and payload as in **`messages.md`** (e.g. **reply with \`Blocked(reasons)\`**). You **do not** need **`reply to [Actor](path)`** links: the recipient actor lists that message name under **`## Receives`**; **`messages.scala`** supplies the full type.
+- **Message definitions** — under **`specs/`**, whatever markdown file(s) hold **canonical** pseudocode for **all** inter-actor messages (signatures, payloads, glosses, shared ADTs). Locate them by scanning **`specs/`** and reading structure — **no** fixed filename. The harness generates **`messages.scala`** from that content (not by merging full bullets from each actor spec).
+- **Each actor spec → `## Receives`** — **name only**: one bullet per message type this actor accepts, e.g. `` - `PortPluginRequest` ``. **No** payloads or glosses in the actor file — those stay in the message-definitions markdown only.
+- **Workflow** steps that **reply** name the message and payload consistently with the message definitions (e.g. **reply with \`Blocked(reasons)\`**). The recipient actor lists that message name under **`## Receives`**; **`messages.scala`** supplies the full type.
 
 ## `messages.scala` — shared protocol types
 
-Inter-actor messages are defined **once** in **`specs/messages.md`** and compiled to **`messages.scala`** (lowercase filename, e.g. `src/main/scala/<pkg>/messages.scala`).
+Inter-actor messages are defined **once** in the suite’s message-definitions markdown under **`specs/`** and compiled to **`messages.scala`** (lowercase filename is conventional, e.g. `src/main/scala/<pkg>/messages.scala`).
 
 **Include there:**
 
-- Every message described in **`messages.md`**, translated to **`final case class` / `case object` / `sealed trait`** as appropriate.
+- Every message described in the message-definitions file, translated to **`final case class` / `case object` / `sealed trait`** as appropriate.
 - Shared ADTs used in payloads (e.g. `BlockerReason` variants) — define once, reference from multiple messages.
-- **`replyTo` types:** resolve from the **`messages.md`** definition (e.g. `_PortPluginOutcome_` → sealed family or union of outcome messages also listed in **`messages.md`**).
+- **`replyTo` types:** resolve from those definitions (e.g. outcome unions or sealed families listed alongside requests).
 
 **Do not** put **`messages.scala`** content inside individual actor objects — actor files reference these types by import or by being in the same package.
 
@@ -68,7 +68,7 @@ def awaitingGatekeeper(...): Behavior[AcceptedMessages] =
 
 ## `(Agentic Step)` and subagents
 
-- **`Spawn the Subagent [The Gatekeeper](03-actor-the-gatekeeper.md)`** → `context.spawn(TheGatekeeper(deps), "gatekeeper-...")`. **`tell`** the child using **receive** types from **`messages.scala`** that match **The Gatekeeper**’s spec (e.g. **`GatekeeperRequest`**). The parent’s **`AcceptedMessages`** includes whatever **this** actor **receives back** from that child (listed in **this** actor’s `## Receives` as names → types from **`messages.md`**).
+- **`Spawn the Subagent [The Gatekeeper](03-actor-the-gatekeeper.md)`** → `context.spawn(TheGatekeeper(deps), "gatekeeper-...")`. **`tell`** the child using **receive** types from **`messages.scala`** that match **The Gatekeeper**’s spec (e.g. **`GatekeeperRequest`**). The parent’s **`AcceptedMessages`** includes whatever **this** actor **receives back** from that child (listed in **this** actor’s `## Receives` as names → types from **`messages.scala`**).
 - Subagent specs are separate files — **`object TheGatekeeper`** in **`TheGatekeeper.scala`** with **its own** **`AcceptedMessages`** (subset of **`messages.scala`** + internals).
 - Pure LLM on this actor (no child actor): **`LLMActor.start[O]`** per [library-api.md](library-api.md).
 
@@ -107,7 +107,7 @@ If a workflow step needs **non-obvious** parsing, path logic, or orchestration:
 
 ## Worked example (structural sketch)
 
-**Specs:** **`specs/messages.md`** defines **`PortPluginRequest`**, **`AlreadyPorted`**, **`Blocked`**, **`GatekeeperOutcome`**, … in full. **Get It Passing** lists **`PortPluginRequest`**, **`GatekeeperOutcome`**, … under **`## Receives`** (names only). **Port Plugin Client** lists **`AlreadyPorted`**, **`Blocked`**, … (names only). **`messages.scala`** is the union of **all** messages from **`messages.md`**.
+**Specs:** the suite’s message-definitions markdown under **`specs/`** defines **`PortPluginRequest`**, **`AlreadyPorted`**, **`Blocked`**, **`GatekeeperOutcome`**, … in full. **Get It Passing** lists **`PortPluginRequest`**, **`GatekeeperOutcome`**, … under **`## Receives`** (names only). **Port Plugin Client** lists **`AlreadyPorted`**, **`Blocked`**, … (names only). **`messages.scala`** is the union of **all** messages from that definitions file.
 
 **`messages.scala`** (abbreviated):
 
@@ -116,7 +116,7 @@ package com.example
 
 import org.apache.pekko.actor.typed.ActorRef
 
-// Generated from specs/messages.md — one definition each
+// Generated from the suite message-definitions markdown — one definition each
 sealed trait PortPluginOutcome
 case object AlreadyPorted extends PortPluginOutcome
 final case class Blocked(reasons: List[BlockerReason]) extends PortPluginOutcome
