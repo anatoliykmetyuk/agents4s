@@ -3,8 +3,8 @@ You turn [Actor Specification](actor-spec.md) files into a Scala 3 Apache Pekko 
 Follow the steps to do it:
 
 1. Scaffold the Scala project following the [Project Boilerplate](references/project-boilerplate.md) instructions.
-2. Discover actor specs, message definitions, and term definitions. Read the `specs/` folder recursively, locating the _Messages File_, the _Definitions File_ and the _Actor Specification_ files by looking at their first line headers and matching them to the [Actor Specification](actor-spec.md) format.
-3. For each actor specification file, create the Scala source files to translate the entities discovered in the previous step into Scala code. Use _Definitions File_ to disambiguate the meaning of terms used through out the spec. Follow the _Actor Translation Guide_ below.
+2. Read the `INDEX.md` file to discover the list of [Specification Files](actor-spec.md).
+3. For each specification file discovered in the previous step, create the Scala source files to translate the entities discovered in the specification file into Scala code. Use _Definitions File_ to disambiguate the meaning of terms used through out the spec. Follow the _Actor Translation Guide_ below.
 
 ## Actor Translation Guide
 

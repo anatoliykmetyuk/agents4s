@@ -9,6 +9,7 @@ The following files are output by this workflow:
 - _The Messages File_ - default `messages.md`, may be overridden by the user - is the single source of truth for all inter-actor messages definitions.
 - _The Definitions File_ - default `definitions.md`, may be overridden by the user - is the single source of truth for all project-specific defined terms.
 - _Actor Spec Files_ - default `01-actor-<actor-name-kebab-case>.md`, may be overridden by the user - are markdown files that contain the specification of Pekko Typed actors, one file per actor.
+- _Index File_ - `INDEX.md`, is a markdown file that contains a list of all the actor specification files.
 
 ## The Actor Specification Format
 
@@ -82,6 +83,25 @@ Follow the following rules for the Message File Format:
 - No line break between the signature and its description.
 - The messages are intentionally specified as pseudocode - do not attempt to write real code in the Messages File.
 - The description is a few sentences at most, prefer short descriptions. The purpose of the description is to convey the intent of the message concisely.
+
+## The Index File Format
+
+The _Index File_ is a markdown file that contains a list of all the actor specification files. It is structured as follows:
+
+```markdown
+# Index
+
+File Name | File Type
+--------- | ---------
+`messages.md` | Messages File
+`definitions.md` | Definitions File
+`actors/actor1.md` | Actor Specification File
+`actors/actor2.md` | Actor Specification File
+...
+```
+
+- File Name is the path to the file relative to the `specs/` folder.
+- File Type is the type of the file, one of the following: Messages File, Definitions File, Actor Specification File.
 
 ## Rules for Writing Specifications
 
