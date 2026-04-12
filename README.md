@@ -73,8 +73,8 @@ Auto-format: `sbt scalafmtAll`
 ## Tests
 
 ```bash
-scripts/test.sh          # unit tests only
-scripts/test.sh -i       # full suite including live agent integration
+scripts/test.sh          # full suite (integration runs when agent + tmux available)
+scripts/test.sh -u       # unit tests only (skip integration)
 ```
 
 ## License

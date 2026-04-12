@@ -20,7 +20,7 @@ import org.scalatest.time.SpanSugar.*
 import upickle.default.*
 import upickle.jsonschema.*
 
-/** Live Cursor `agent` + tmux; run with `scripts/test.sh -i` (see [[gate]]). */
+/** Live Cursor `agent` + tmux; runs by default, opt out with CURSOR_DRIVER_INTEGRATION=0 (see [[gate]]). */
 class LLMActorIntegrationSpec
     extends AnyFunSuite
     with Matchers
@@ -30,11 +30,11 @@ class LLMActorIntegrationSpec
   private val model: String =
     sys.env.getOrElse("CURSOR_DRIVER_MODEL", "composer-2-fast")
 
-  private def integrationEnvSet: Boolean =
-    sys.env.get("CURSOR_DRIVER_INTEGRATION").map(_.trim.toLowerCase).exists(Set("1", "true", "yes"))
+  private def integrationOptedOut: Boolean =
+    sys.env.get("CURSOR_DRIVER_INTEGRATION").map(_.trim.toLowerCase).exists(Set("0", "false", "no", "off"))
 
   private def gate(): Unit =
-    assume(integrationEnvSet, "Set CURSOR_DRIVER_INTEGRATION=1 to run live LLMActor tests")
+    assume(!integrationOptedOut, "CURSOR_DRIVER_INTEGRATION opt-out is set; skipping live LLMActor tests")
     assume(Paths.which("agent").nonEmpty, "Cursor `agent` CLI not on PATH")
     assume(Paths.which("tmux").nonEmpty, "tmux not on PATH")
 

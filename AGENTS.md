@@ -26,17 +26,17 @@ Runs `scalafmtCheckAll`.
 scripts/test.sh
 ```
 
-Runs **unit tests only** (`CursorTuiOpsTest`, `CursorAgentSpec`, `PathsTest`, `PaneTraitTest`, `LLMActorSpec`).
+Runs the **full test suite** (`sbt test`). Integration tests (`CursorAgentIntegrationTest`, `LLMActorIntegrationSpec`) are included and will execute when `agent` and `tmux` are on `PATH`; they are automatically skipped otherwise.
 
-Integration tests (live `agent` + tmux) require:
+To run **unit tests only** (faster cycle without integration):
 
 ```bash
-scripts/test.sh -i
+scripts/test.sh -u
 ```
 
-This sets `CURSOR_DRIVER_INTEGRATION=1`. Integration tests are skipped/canceled when the variable is not set to `1` / `true` / `yes`, or when `agent` / `tmux` are missing from `PATH`. That includes `CursorAgentIntegrationTest` and `LLMActorIntegrationSpec` (live `CursorAgent` + `LLMActor` with `composer-2-fast`, overridable via `CURSOR_DRIVER_MODEL`).
+Integration tests are **opt-out**: set `CURSOR_DRIVER_INTEGRATION=0` (or `false` / `no` / `off`) to skip them even when `agent` and `tmux` are available. CI sets this variable to `0` on the required build job. The model used by live integration defaults to `composer-2-fast` and can be overridden via `CURSOR_DRIVER_MODEL`.
 
-Extra arguments are forwarded to `sbt` (after the optional `-i` flag).
+Extra arguments are forwarded to `sbt` (after the optional flag).
 
 ### Coverage (scoverage)
 
@@ -44,15 +44,15 @@ Extra arguments are forwarded to `sbt` (after the optional `-i` flag).
 scripts/coverage.sh
 ```
 
-Runs **`clean` → `coverage` → unit tests only** (`CursorTuiOpsTest`, `CursorAgentSpec`, `PathsTest`, `PaneTraitTest`, `LLMActorSpec`) → `coverageReport`. HTML output is under `agents4s-core/target/scala-<version>/scoverage-report/`, `agents4s-testkit/target/scala-<version>/scoverage-report/`, and `agents4s-pekko/target/scala-<version>/scoverage-report/` (artifact uploads use a recursive glob).
+Runs **`clean` → `coverage` → full test suite** → `coverageReport`. Integration tests run when `agent` and `tmux` are on `PATH` (skipped otherwise). HTML output is under `agents4s-core/target/scala-<version>/scoverage-report/`, `agents4s-testkit/target/scala-<version>/scoverage-report/`, and `agents4s-pekko/target/scala-<version>/scoverage-report/` (artifact uploads use a recursive glob).
 
-To aggregate coverage **including** integration tests (when `CURSOR_DRIVER_INTEGRATION` is set and `agent` / `tmux` are available; otherwise those tests are canceled):
+To collect coverage for **unit tests only**:
 
 ```bash
-scripts/coverage.sh -i
+scripts/coverage.sh -u
 ```
 
-CI runs unit coverage on every push; an optional job also invokes `scripts/coverage.sh -i` (non-blocking) for a fuller report artifact when integration prerequisites exist.
+CI runs coverage with `CURSOR_DRIVER_INTEGRATION=0` on the required build job (integration skipped); an optional job runs `scripts/coverage.sh` without the opt-out for a fuller report artifact when integration prerequisites exist.
 
 ## Harness skill
 
