@@ -15,7 +15,7 @@ ThisBuild / licenses := List(
 
 lazy val root = project
   .in(file("."))
-  .aggregate(core, pekko)
+  .aggregate(core, testkit, pekko)
   .settings(
     name := "agents4s-root",
     publish / skip := true,
@@ -34,9 +34,16 @@ lazy val core = project
     ),
   )
 
+lazy val testkit = project
+  .in(file("agents4s-testkit"))
+  .dependsOn(core)
+  .settings(
+    name := "agents4s-testkit",
+  )
+
 lazy val pekko = project
   .in(file("agents4s-pekko"))
-  .dependsOn(core)
+  .dependsOn(core, testkit % Test)
   .settings(
     name := "agents4s-pekko",
     Test / fork := true,

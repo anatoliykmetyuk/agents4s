@@ -1,10 +1,14 @@
-package agents4s.pekko
+package agents4s.testkit
 
 import scala.collection.mutable
 
 import agents4s.Agent
 
-/** Test double for [[agents4s.Agent]] with scripted [[isBusy]] phases per [[sendPrompt]] round. */
+/** Test double for [[agents4s.Agent]] with scripted [[isBusy]] phases per [[sendPrompt]] round.
+  *
+  * Published in **`agents4s-testkit`** for harness and library tests; depends only on
+  * **`agents4s-core`**.
+  */
 final class StubAgent(
     val workspace: java.nio.file.Path,
     val model: String = "stub-model",

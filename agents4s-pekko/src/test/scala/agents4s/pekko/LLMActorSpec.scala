@@ -10,6 +10,8 @@ import org.scalatest.ParallelTestExecution
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
+import agents4s.testkit.StubAgent
+
 import upickle.default.*
 import upickle.jsonschema.*
 

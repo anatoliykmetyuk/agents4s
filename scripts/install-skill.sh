@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-echo "Publishing agents4s-core to local Ivy cache (sbt publishLocal)..."
+echo "Publishing agents4s artifacts to local Ivy cache (sbt publishLocal)..."
 sbt publishLocal
 
 echo "Removing previously installed skill..."

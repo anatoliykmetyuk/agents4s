@@ -131,9 +131,9 @@ Put everything the model must do **before** the structured JSON step into **`inp
 
 ## Testing
 
-Unit tests **must not** start real tmux. Implement **`agents4s.Agent`** with a **stub** (see **`StubAgent`** in **`agents4s-pekko`** tests: `agents4s-pekko/src/test/scala/agents4s/pekko/StubAgent.scala`) or copy a minimal stub into your harness test sources.
+Unit tests **must not** start real tmux. Use **`agents4s.testkit.StubAgent`** from **`me.anatoliikmt` %% `agents4s-testkit`** (`% Test`; depends on **`agents4s-core`** only — see [project-boilerplate.md](project-boilerplate.md)).
 
-**Pattern:** `ActorTestKit`, **`LLMActor.start[O](probe.ref, stub, ...)`**, **`onSendPrompt`** detects the result prompt (e.g. contains `"following path:"`), writes valid JSON to that path. **`busyPhases`** simulates idle/busy ticks so the heartbeat logic is exercised. See **`LLMActorSpec`** in the same module.
+**Pattern:** `ActorTestKit`, **`LLMActor.start[O](probe.ref, stub, ...)`**, **`onSendPrompt`** detects the result prompt (e.g. contains `"following path:"`), writes valid JSON to that path. **`busyPhases`** simulates idle/busy ticks so the heartbeat logic is exercised. See **`LLMActorSpec`** in **`agents4s-pekko`**.
 
 Integration tests (live `agent` + tmux) should stay **gated** by an env var, same as **`LLMActorIntegrationSpec`**.
 

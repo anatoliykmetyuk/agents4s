@@ -36,9 +36,9 @@ exec sbt test "$@"
 
 ## `build.sbt` (snippet)
 
-**agents4s-pekko** is a **local SNAPSHOT** artifact (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in this repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes.
+**agents4s-pekko** and **agents4s-testkit** are **local SNAPSHOT** artifacts (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in this repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes.
 
-Use **`me.anatoliikmt` %% `agents4s-pekko`** for **`LLMActor`** and uPickle JSON output types; it depends on **`agents4s-core`**, **Pekko Typed**, **uPickle**, and **upickle-jsonschema** transitively. Add **testkit** and **ScalaTest** explicitly.
+Use **`me.anatoliikmt` %% `agents4s-pekko`** for **`LLMActor`** and uPickle JSON output types; it depends on **`agents4s-core`**, **Pekko Typed**, **uPickle**, and **upickle-jsonschema** transitively. Add **`agents4s-testkit`** ( **`StubAgent`** and future test helpers; depends on core only), **Pekko testkit**, and **ScalaTest** for tests.
 
 ```scala
 val scala3Version = "3.8.3"
@@ -50,6 +50,7 @@ lazy val harness = project
     scalaVersion := scala3Version,
     libraryDependencies ++= Seq(
       "me.anatoliikmt" %% "agents4s-pekko" % "0.1.0-SNAPSHOT",
+      "me.anatoliikmt" %% "agents4s-testkit" % "0.1.0-SNAPSHOT" % Test,
       "org.apache.pekko" %% "pekko-actor-testkit-typed" % "1.1.2" % Test,
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
     ),

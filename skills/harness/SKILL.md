@@ -61,7 +61,7 @@ Shell scripts live under **`scripts/`** and `cd` to the repo root before invokin
 
 ## Step 2 — Scaffold or extend the project
 
-For new projects, use [references/project-boilerplate.md](references/project-boilerplate.md): **`build.sbt`** (**`agents4s-pekko`** + testkit + ScalaTest), **`application.conf`** (default dispatcher), **`scripts/*.sh`**, **`.gitignore`**, `out/`.
+For new projects, use [references/project-boilerplate.md](references/project-boilerplate.md): **`build.sbt`** (**`agents4s-pekko`** + **`agents4s-testkit`** `% Test` + ScalaTest), **`application.conf`** (default dispatcher), **`scripts/*.sh`**, **`.gitignore`**, `out/`.
 
 For incremental adds: locate existing actors and **only** add new files + minimal edits to parents (spawn route, message forwarding).
 
@@ -91,7 +91,7 @@ One template per agentic **task**; use `{{TOKENS}}`. **`LLMActor`** adds a secon
 
 ## Step 7 — Tests
 
-Follow [references/testing.md](references/testing.md): `ActorTestKit`, `TestProbe`, stub **`Agent`** (e.g. copied **`StubAgent`**) — no real **`CursorAgent`** in unit tests.
+Follow [references/testing.md](references/testing.md): `ActorTestKit`, `TestProbe`, **`agents4s.testkit.StubAgent`** (`agents4s-testkit` `% Test`) — no real **`CursorAgent`** in unit tests.
 
 ## Checklist
 
@@ -99,7 +99,7 @@ Follow [references/testing.md](references/testing.md): `ActorTestKit`, `TestProb
 - [ ] **One actor per actor spec:** each actor spec has exactly one Scala actor (`// Spec:` + `<!-- impl: -->`); supporting specs do not get an actor.
 - [ ] After any change: **spec markdown and Scala actor** (and prompts if needed) still match.
 - [ ] `scripts/setup.sh`, `scripts/run.sh`, `scripts/test.sh` exist and `cd` to project root.
-- [ ] `build.sbt` includes **`agents4s-pekko`** (+ testkit / ScalaTest).
+- [ ] `build.sbt` includes **`agents4s-pekko`**, **`agents4s-testkit`** (`% Test`), and ScalaTest / Pekko testkit as needed.
 - [ ] Messages only in companion objects; cross-refs use `ActorName.MessageName`; **blank lines only between sealed families** (see [references/actor-guide.md](references/actor-guide.md)).
 - [ ] Agentic steps use **`LLMActor`** + `prompts/` task templates + typed **`O`**.
 - [ ] Parent **`stop()`**s **`CursorAgent`** (or shared **`Agent`**) when the **`LLMActor`** child finishes.
@@ -107,5 +107,5 @@ Follow [references/testing.md](references/testing.md): `ActorTestKit`, `TestProb
 
 ## Maintainer notes
 
-- **Cursor / repo copy:** this folder ships with the [agents4s-core](../../agents4s-core) and [agents4s-pekko](../../agents4s-pekko) modules in this repo; harness **`build.sbt`** uses `publishLocal` artifacts.
+- **Cursor / repo copy:** this folder ships with the [agents4s-core](../../agents4s-core), [agents4s-testkit](../../agents4s-testkit), and [agents4s-pekko](../../agents4s-pekko) modules in this repo; harness **`build.sbt`** uses `publishLocal` artifacts.
 - **Public API for harness work:** [references/llm-actor-guide.md](references/llm-actor-guide.md) (**`Agent`**, **`CursorAgent`**, **`LLMActor`**). When agents4s changes, update that guide so users rarely need the library sources.
