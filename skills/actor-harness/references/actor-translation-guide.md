@@ -77,6 +77,25 @@ def awaitingGatekeeper(...): Behavior[AcceptedMessages] =
 - Subagent specs are separate files — implement **`object TheGatekeeper`** there with **its own** `AcceptedMessages` derived from **that** spec only.
 - If the step is **`(Agentic Step)`** **without** a child actor (pure LLM on this actor’s workspace), use **`LLMActor.start[O]`** per [library-api.md](library-api.md).
 
+### `LLMActor` result type `O`
+
+**`LLMActor.start[O](replyTo, agent, inputPrompt, outputInstructions)`** ([source](../../../agents4s-pekko/src/main/scala/agents4s/pekko/LLMActor.scala)) delivers the model’s structured answer to **`replyTo`** as **`O`** on success (or **`LLMActor.LLMError`** on failure). That **`O`** is whatever you choose as the “success payload” for the step—you model it as a **Scala case class (or types uPickle can derive)** and you must supply **JSON serialization + schema** that the library uses to prompt the model and parse the result file:
+
+- **`ReadWriter`** (uPickle) — so the library can **`read[O]`** the JSON written by the agent.
+- **`JsonSchema`** (upickle-jsonschema) — so the library can embed a schema in the result prompt.
+
+**Typical setup** (minimal boilerplate):
+
+```scala
+import upickle.default.*
+import upickle.jsonschema.*
+
+case class MyStepResult(answer: String, confidence: Option[Double]) derives ReadWriter
+given JsonSchema[MyStepResult] = JsonSchema.derived
+```
+
+Then **`LLMActor.start[MyStepResult](replyTo, ...)`** and adapt **`MyStepResult | LLMError`** into your **`AcceptedMessages`** (usually via **`messageAdapter`**). Full **`LLMActor`** wiring is in [library-api.md](library-api.md); **concrete examples of several `O` types** (imports + **`derives ReadWriter`** + **`given JsonSchema[...] = JsonSchema.derived`**) are in [`LLMActorIntegrationSpec.scala`](../../../agents4s-pekko/src/test/scala/agents4s/pekko/LLMActorIntegrationSpec.scala) (e.g. **`SimpleResult`** and the other result case classes at the top of the suite).
+
 ## Bounded loops
 
 When the spec says “return to step N at most K times”, carry **`attemptsLeft: Int`** (or **`attempt: Int`**) in **behavior parameters** — mirror the bound exactly.
