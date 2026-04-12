@@ -38,9 +38,9 @@ longLived.awaitIdle(30.minutes)
 longLived.stop()
 ```
 
-## Harness skill
+## Actor-harness skill
 
-This repo ships a Cursor agent skill at [`skills/harness/`](skills/harness/) for turning markdown SOPs into **Scala** harnesses that use this library.
+This repo ships a Cursor agent skill at [`skills/actor-harness/`](skills/actor-harness/) for turning **actor-spec** markdown (`specs/`) into **Scala** Pekko harnesses that use this library.
 
 Install (requires Node.js for `npx`):
 

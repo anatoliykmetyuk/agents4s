@@ -1,4 +1,4 @@
-# Harness testing (Pekko Typed + ScalaTest)
+# Actor-harness testing (Pekko Typed + ScalaTest)
 
 Actor-system harnesses should stay **fast and deterministic** in CI: no real **`CursorAgent`**, no tmux, no live `agent` binary in unit tests.
 
@@ -13,10 +13,12 @@ Actor-system harnesses should stay **fast and deterministic** in CI: no real **`
 
 | Layer | Focus | Typical asserts |
 |-------|--------|-----------------|
-| Companion messages | `ActorName.Message` constructors | Equality, reply-to field present |
+| Message types | `ActorName` case class constructors | Equality, `replyTo` present |
 | Pure helpers | Path rules, pure parsing | Outputs for inputs |
 | Actor unit | `BehaviorTestKit` / `TestProbe` | Messages sent, state transitions |
 | Multi-actor | `ActorTestKit` + probes | Parent spawns child; retries capped |
+
+**Union `AcceptedMessages`:** use **`TestProbe[A | B | C]`** (or your full union) so **`expectMessage`** matches the same types the actor emits.
 
 ## Project layout
 
@@ -24,8 +26,7 @@ Actor-system harnesses should stay **fast and deterministic** in CI: no real **`
 <harness>/
   scripts/test.sh
   src/test/scala/<pkg>/
-    OrchestratorTest.scala
-    WorkerATest.scala
+    GetItPassingTest.scala
     LLMActorStepTest.scala   # optional: StubAgent + LLMActor.start
 ```
 
@@ -36,9 +37,9 @@ Use **`scripts/test.sh`** (runs from project root; see [project-boilerplate.md](
 | Need | Approach |
 |------|-----------|
 | Sync test of `Behavior` | `BehaviorTestKit` with a single actor under test |
-| Async interaction | `TestProbe[A]` as `replyTo`; `probe.expectMessage` |
+| Async interaction | `TestProbe[AcceptedMessages]` as `replyTo`; `probe.expectMessage` |
 | Child spawned | Parent factory takes `spawn` hook or use `ActorTestKit` `spawn` |
-| LLM step | Spawn **`LLMActor.start[O]`** with **`StubAgent`**; in **`onSendPrompt`**, when the prompt contains the result-path cue (`"following path:"`), write valid JSON for **`O`** to that path (see [llm-actor-guide.md](llm-actor-guide.md)) |
+| LLM step | Spawn **`LLMActor.start[O]`** with **`StubAgent`**; in **`onSendPrompt`**, when the prompt contains the result-path cue (`"following path:"`), write valid JSON for **`O`** to that path (see [library-api.md](library-api.md)) |
 
 ## `StubAgent` + `LLMActor` (concrete)
 

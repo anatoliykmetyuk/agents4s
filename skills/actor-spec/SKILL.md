@@ -17,7 +17,7 @@ You turn the user prompt into a markdown actor specification — the specificati
 
 ## Why these specs matter
 
-These specifications are the primary input to the **harness** skill, which translates each actor spec into a runnable Scala 3 Pekko Typed actor. The harness maps messages to sealed trait hierarchies, workflow steps to behavior logic, and subagent-spawning steps to child actor lifecycles. A well-written spec produces a clean actor with minimal manual fixup; a vague or inconsistent spec forces rework. Keep this downstream translation in mind — be concrete enough that someone (or a tool) reading the spec can produce the actor without guessing.
+These specifications are the primary input to the **actor-harness** skill, which translates each actor spec into a runnable Scala 3 Pekko Typed actor. The harness maps messages to Scala types (including union-typed mailboxes), workflow steps to behavior logic, and subagent-spawning steps to child actor lifecycles. A well-written spec produces a clean actor with minimal manual fixup; a vague or inconsistent spec forces rework. Keep this downstream translation in mind — be concrete enough that someone (or a tool) reading the spec can produce the actor without guessing.
 
 ## The Specification Format
 
@@ -96,7 +96,7 @@ Keep payloads flat: use stdlib types directly in the message. For example, prefe
 
 Introduce a named algebraic type (sealed-style variants in prose) only when the **same** shape is **reused across more than one message** in the protocol. Example: a `BlockerReason` shared by `Blocked(reasons: List[BlockerReason])` and `ValidationFailed(reason: BlockerReason)` documents domain semantics once and stays consistent. Do not invent wrappers that appear in a single message only.
 
-**Why:** The harness turns these into Scala 3 sealed traits and case classes. Noise types and third-party classes create boilerplate and dependency risk; flat stdlib-first payloads keep generated code small and predictable.
+**Why:** The actor-harness skill turns these into Scala 3 traits and case classes. Noise types and third-party classes create boilerplate and dependency risk; flat stdlib-first payloads keep generated code small and predictable.
 
 ### List layout for each message
 
@@ -130,9 +130,9 @@ The following patterns appear frequently in well-written workflows. Read [exampl
 
 **Conditional branching.** When a step has different outcomes, spell out each branch explicitly: "If it has cleared the porting, proceed with the next steps. If it has denied porting, stop the workflow here and report to the requesting agent with a corresponding message according to your messaging protocol."
 
-**Bounded loops.** When a step can be retried, state the bound: "go back to step 6... It is possible to return to step 6 no more than 3 times." Without an explicit bound, the harness cannot know when to give up.
+**Bounded loops.** When a step can be retried, state the bound: "go back to step 6... It is possible to return to step 6 no more than 3 times." Without an explicit bound, the actor-harness skill cannot know when to give up.
 
-**Agentic steps.** When a step is meant to be carried out by an **LLM agent** (judgment, natural-language reasoning, or tool use that is not pure deterministic code), start the step text with **`(Agentic Step)`** so the harness can route it to agentic execution (e.g. `LLMActor`). Subagent delegation often implies an agentic child, but the marker applies to **this** actor’s step: use it when **this** step’s work is agentic (including “spawn subagent and interpret its reply” when that interpretation is non-mechanical). Purely deterministic steps (fixed shell commands, file moves, simple conditionals on structured data) do not need the marker.
+**Agentic steps.** When a step is meant to be carried out by an **LLM agent** (judgment, natural-language reasoning, or tool use that is not pure deterministic code), start the step text with **`(Agentic Step)`** so the actor-harness skill can route it to agentic execution (e.g. `LLMActor`). Subagent delegation often implies an agentic child, but the marker applies to **this** actor’s step: use it when **this** step’s work is agentic (including “spawn subagent and interpret its reply” when that interpretation is non-mechanical). Purely deterministic steps (fixed shell commands, file moves, simple conditionals on structured data) do not need the marker.
 
 Example: `4. **(Agentic Step)** Spawn the Subagent [Reviewer](specs/reviewer.md) and, based on its structured reply, decide whether to post comments.`
 

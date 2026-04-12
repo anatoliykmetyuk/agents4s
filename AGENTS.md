@@ -54,16 +54,16 @@ scripts/coverage.sh -u
 
 CI runs coverage with `CURSOR_DRIVER_INTEGRATION=0` on the required build job (integration skipped); an optional job runs `scripts/coverage.sh` without the opt-out for a fuller report artifact when integration prerequisites exist.
 
-## Harness skill
+## Actor-harness skill
 
-The harness skill turns a **`specs/`** directory (markdown actor specifications) into a **Scala 3 Apache Pekko Typed** project you can run with sbt.
+The **actor-harness** skill turns a **`specs/`** directory (**actor-spec** markdown: `# <Actor Name> Actor Specification`) into a **Scala 3 Apache Pekko Typed** project you can run with sbt.
 
 - **Hybrid workflow:** rote steps are **Scala** in actor behaviors; judgment-heavy steps use **`agents4s.cursor.CursorAgent`** via **`agents4s.pekko.LLMActor`** (heartbeat-driven child actor, not the parent dispatcher).
-- **Message layout:** each actor’s input and output types live in its **companion object** and are referenced project-wide as **`ActorName.MessageName`** (no separate `protocol/` package).
-- **Links:** specs and code cross-reference with `<!-- impl: … -->` in markdown and `// Spec: specs/…` in Scala so you can add new `specs/*.md` and implement **incrementally** without rewriting the whole system.
-- **Project shape:** generated harnesses use **`scripts/setup.sh`**, **`scripts/run.sh`**, **`scripts/test.sh`** (repo root), **`prompts/`** for agentic templates, and **`skills/harness/references/`** (`spec-format.md`, `project-boilerplate.md`, `actor-guide.md`, `llm-actor-guide.md`, `testing.md`).
+- **Message layout:** each actor’s messages live in its **`object ActorName`**; accepted mailboxes use **Scala 3 union types** (`Message1 | Message2 | …`) aligned with the spec’s **Messaging Protocol** and child completions.
+- **Traceability:** add `// Spec: specs/…` in generated Scala to point at the source actor specification.
+- **Project shape:** generated harnesses use **`scripts/setup.sh`**, **`scripts/run.sh`**, **`scripts/test.sh`** (repo root), **`prompts/`** for agentic templates, and **`skills/actor-harness/references/`** (`project-boilerplate.md`, `actor-translation-guide.md`, `library-api.md`, `testing.md`). Pair with **`skills/actor-spec/`** for writing specs.
 
-Read **`skills/harness/SKILL.md`** for the full workflow. Install the skill globally:
+Read **`skills/actor-harness/SKILL.md`** for the full workflow. Install the skills globally:
 
 ```bash
 scripts/install-skill.sh

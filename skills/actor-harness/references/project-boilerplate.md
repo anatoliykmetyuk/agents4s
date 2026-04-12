@@ -93,6 +93,8 @@ out/
 
 ## Directory layout (reference)
 
+Actor-spec harnesses typically use **one Scala file per actor object**. If an actor needs **helper modules**, add a **subpackage** named after that actor (lower case) containing **`ActorName.scala`** + **`helpers.scala`** (see **Step 4** in `SKILL.md`).
+
 ```
 my-harness/
 ├── specs/
@@ -100,7 +102,10 @@ my-harness/
 ├── prompts/
 ├── src/main/scala/<pkg>/
 │   ├── Main.scala
-│   ├── ...                    # one Scala file per actor typical
+│   ├── GetItPassing.scala
+│   └── getitpassing/          # optional per-actor package
+│       ├── GetItPassing.scala
+│       └── helpers.scala
 ├── src/main/resources/application.conf
 ├── src/test/scala/<pkg>/
 ├── build.sbt
@@ -112,7 +117,7 @@ my-harness/
 The **task** prompt describes what the model should do in the workspace. **`LLMActor`** adds a separate **result** prompt with JSON path and schema; describe output **fields** in code via **`outputInstructions`**, not necessarily in this file.
 
 ```markdown
-You are inspecting **one** work item. Follow the spec in the attached procedure.
+You are inspecting **one** work item. Follow the actor specification procedure.
 
 ## Context
 
@@ -130,3 +135,5 @@ When finished, wait for the next instruction (structured JSON step).
 ```
 
 Load with **`PromptTemplate.load("inspect.md", Map("ITEM_ID" -> ..., "WORKSPACE" -> ...))`** and pass the string as **`inputPrompt`** to **`LLMActor.start`**. Use **`outputInstructions`** such as: *`status` is one of OK, NEEDS_WORK, BLOCKED; `reason` is optional text.*
+
+Default **Cursor** model for live runs is **`composer-2-fast`** unless the user overrides it (matches repo integration defaults).
