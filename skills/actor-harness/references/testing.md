@@ -43,7 +43,7 @@ Use **`scripts/test.sh`** (runs from project root; see [project-boilerplate.md](
 
 ## `StubAgent` + `LLMActor` (concrete)
 
-Add **`"me.anatoliikmt" %% "agents4s-testkit" % "<version>" % Test`** (see [project-boilerplate.md](project-boilerplate.md)). **`busyPhases`** controls how many heartbeat ticks **`isBusy`** returns true after each **`sendPrompt`**.
+Add **`"me.anatoliikmt" %% "agents4s-testkit" % "<version>" % Test`** (see [project-boilerplate.md](project-boilerplate.md)). **`busyPhases`** controls how **`StubAgent`** simulates **`isBusy`** after each **`sendPrompt`** (see testkit source).
 
 ```scala
 import java.nio.charset.StandardCharsets

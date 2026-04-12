@@ -42,11 +42,7 @@ class CursorAgent(
 
 ## `agents4s.pekko.LLMActor`
 
-### Object members
-
-- `val HeartbeatTimerKey` — internal timer key.
-- `case object HeartbeatTick` — timer message (only message type of the child’s `Behavior`).
-- `case class LLMError(e: Exception)` — failure after retries.
+Failures after the library exhausts its own retries are delivered on **`replyTo`** as **`LLMActor.LLMError`**.
 
 ### `start`
 
@@ -56,21 +52,16 @@ def start[O: JsonSchema: ReadWriter](
     agent: Agent,
     inputPrompt: String,
     outputInstructions: String
-): Behavior[LLMActor.HeartbeatTick.type]
+)
 ```
 
-**Sequence (high level):**
+Returns a **`Behavior`** to **`spawn`**; you interact only through **`replyTo`** (**`O`** on success, **`LLMError`** on failure).
 
-1. `agent.start()`, `awaitIdle` (bounded wait), then `sendPrompt(inputPrompt, promptAsFile = true)` for the **task**.
-2. **1s** heartbeat: while `agent.isBusy`, stay in behavior; when idle, send a **follow-up** prompt that asks the model to write **JSON** to a **temp file**, with auto-generated **JSON Schema** for **`O`**.
-3. Read and uPickle-parse that file into **`O`**. On failure, retry the result prompt up to **3** times, then `replyTo ! LLMError(e)`.
-4. On success, `replyTo ! o` and **`Behaviors.stopped`**.
+**What it does (high level):** runs the **task** from **`inputPrompt`**, then asks the model for **structured JSON** matching **`O`** (schema + instructions come from **`outputInstructions`** and the library). Parses the result and **`tell`**s **`replyTo`**, then stops.
 
-**Important:** `LLMActor` **does not** call `agent.stop()`. The **parent** owns the `Agent` and should `stop()` when finished (e.g. after the child terminates — `context.watchWith`).
+**Important:** `LLMActor` **does not** call **`agent.stop()`**. The **parent** owns the **`Agent`** and should **`stop()`** when the run is finished (e.g. when the child stops — **`context.watchWith`**).
 
-**Timeouts:** Heartbeat interval is fixed (**1s**); total wall-clock limits belong in the **parent** (`Behaviors.withTimers`, etc.). Initial idle wait inside `start` uses a **100s** window in the library.
-
-**Do not** call `agent.awaitIdle` / `sendPrompt` / `start` from the **parent** actor’s `receiveMessage` thread for LLM work — spawn this child instead.
+**Do not** call **`agent.awaitIdle`** / **`sendPrompt`** / **`start`** from the **parent**’s **`receiveMessage`** for LLM work — spawn this child instead. For **overall** deadlines or cancellation, use the **parent** (timers, `context.stop`, etc.).
 
 ---
 
@@ -112,7 +103,7 @@ final class StubAgent(
 ) extends Agent
 ```
 
-- **`busyPhases`:** After each `sendPrompt`, `isBusy` returns `true` for the next N heartbeat ticks per phase entry (see testkit source for exact semantics).
+- **`busyPhases`:** Controls how **`StubAgent`** simulates **`isBusy`** after each **`sendPrompt`** in tests (see testkit source for exact semantics).
 - **`onSendPrompt`:** Hook to simulate writes when the prompt contains the result-path cue (`"following path:"`).
 
 Use with **`LLMActor.start[O](probe.ref, stub, ...)`** in unit tests — no tmux, no real `agent` binary.

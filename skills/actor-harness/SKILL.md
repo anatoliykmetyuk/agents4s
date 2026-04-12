@@ -16,7 +16,7 @@ description: >
 
 # Actor harness — actor-spec markdown to Pekko (Scala 3)
 
-You turn **`specs/*.md`** files that follow the **actor-spec** format into a **runnable** Scala 3 project: **Pekko Typed** for structure, **`agents4s.pekko.LLMActor`** + **`agents4s.cursor.CursorAgent`** for **(Agentic Step)** workflow lines. Mechanical work stays in actor `Behavior`s; LLM work runs in a **child** **`LLMActor`** that heartbeats on **`agent.isBusy`** so the parent never blocks on tmux polling.
+You turn **`specs/*.md`** files that follow the **actor-spec** format into a **runnable** Scala 3 project: **Pekko Typed** for structure, **`agents4s.pekko.LLMActor`** + **`agents4s.cursor.CursorAgent`** for **(Agentic Step)** workflow lines. Mechanical work stays in actor `Behavior`s; LLM work runs in a **child** **`LLMActor`** so the parent never blocks on tmux polling while the agent runs.
 
 **Input contract:** specs are written with the **actor-spec** skill. Canonical title: `# <Actor Name> Actor Specification`. Sections: **Actor Purpose**, optional **Definitions**, **Messaging Protocol** (`### Receives`, `### Sends`), **Workflow**.
 
