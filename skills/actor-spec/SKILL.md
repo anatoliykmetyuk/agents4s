@@ -86,3 +86,7 @@ Infer the naming convention from the existing files in the `specs/` folder or fr
 - Each actor should do one specific job. Split complex jobs into multiple actors.
 - Use precise language — avoid generalizations, omissions, ambiguity.
 - Write in second person ("Your purpose is to...").
+
+## Evals
+
+Benchmark prompts and assertion definitions for this skill live in [evals/evals.json](evals/evals.json). Use them with the skill-creator workflow when measuring regressions or comparing skill versions.
