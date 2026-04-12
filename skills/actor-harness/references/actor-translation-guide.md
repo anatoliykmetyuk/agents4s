@@ -7,84 +7,74 @@ Use this when implementing **[skills/actor-harness/SKILL.md](../SKILL.md)** agai
 - Spec heading: `# Get It Passing Actor Specification`
 - Scala: `object GetItPassing` (PascalCase, strip “Actor Specification” from the title words — use the actor name phrase only).
 
-Add `// Spec: specs/01-0-actor-get-it-passing.md` (or actual path) at the top of the file.
+Add `// Spec: specs/01-0-actor-get-it-passing.md` (or actual path) at the top of each actor `.scala` file.
 
-## Messaging Protocol → types
+## Spec format (actor-spec)
 
-### `### Receives`
+- **`specs/messages.md`** — **canonical** definitions for **all** inter-actor messages: pseudocode signatures, payloads, glosses, shared ADTs. The harness generates **`messages.scala`** from this file (not by merging full bullets from each actor spec).
+- **Each actor spec → `## Messaging Protocol` → `### Receives`** — **name only**: one bullet per message type this actor accepts, e.g. `` - `PortPluginRequest` ``. **No** payloads or glosses in the actor file — those stay in **`messages.md`** only.
+- **Workflow** steps that **reply** name the message and payload as in **`messages.md`** (e.g. **reply with \`Blocked(reasons)\`**). You **do not** need **`reply to [Actor](path)`** links: the recipient actor lists that message name under **`### Receives`**; **`messages.scala`** supplies the full type.
 
-Each bullet ``- `MessageName(...)` - gloss`` becomes a **`final case class MessageName(...)`** (or a **`case object`** if no parameters).
+## `messages.scala` — shared protocol types
 
-- If the gloss implies a **request/response** to an external caller, add **`replyTo: ActorRef[...]`** where **`...`** is a union or sealed type built from **`### Sends`** for that interaction.
-- Payload types in the spec are **Scala/Java stdlib** — mirror them (`java.nio.file.Path`, `Option[...]`, etc.).
+Inter-actor messages are defined **once** in **`specs/messages.md`** and compiled to **`messages.scala`** (lowercase filename, e.g. `src/main/scala/<pkg>/messages.scala`).
 
-### `### Sends`
+**Include there:**
 
-Each outgoing message becomes a **response or notification** type in the same object:
+- Every message described in **`messages.md`**, translated to **`final case class` / `case object` / `sealed trait`** as appropriate.
+- Shared ADTs used in payloads (e.g. `BlockerReason` variants) — define once, reference from multiple messages.
+- **`replyTo` types:** resolve from the **`messages.md`** definition (e.g. `_PortPluginOutcome_` → sealed family or union of outcome messages also listed in **`messages.md`**).
 
-- Parameterless responses → **`case object`** or **`case class`** with fields as in the signature.
-- **Sum types** in the spec (e.g. `LibraryBlocker | PluginBlocker | OtherBlocker`) → **`sealed trait`** + **`case class`** variants **tightly packed** (no blank lines inside one sealed family; one blank line between unrelated groups — see layout below).
+**Do not** put **`messages.scala`** content inside individual actor objects — actor files reference these types by import or by being in the same package.
 
-### Messages not in the spec (implementation)
+## Actor `object` contents
 
-- **Private/internal** messages for **this** actor only: timers, **`messageAdapter`** targets for **`LLMActor`**, etc. Example: `private case object RetryTick`.
-- **LLM completion:** after `messageAdapter`, map **`O | LLMActor.LLMError`** into types you include in **`AcceptedMessages`** (often small **private** case classes **only** for LLM wiring — not for child actors; see below).
+Each **`object <ActorName>`** (in **`<ActorName>.scala`**) holds:
 
-### Where each actor’s protocol lives
-
-- **`### Receives`** and **`### Sends`** for actor **A** are **`final case class` / `sealed trait`** definitions in **`object A`** in **`A.scala`** (that actor’s file). **Never** re-declare another actor’s messages in a parent file.
-- **Child actors:** the same — all of **`TheGatekeeper`**’s protocol types live under **`object TheGatekeeper`** in **`TheGatekeeper.scala`**.
-- **Parent handling child traffic:** the parent **`AcceptedMessages`** union includes the **actual** message types **declared on the child** (the messages the child **`tell`**s upward — that spec’s **`### Sends`** / internal-to-child types as you implement them). **Import** those types from the child companion (e.g. **`import TheGatekeeper.GatekeeperResponse`**) or refer to them as **`TheGatekeeper.GatekeeperResponse`**. **Do not** introduce a parallel **`private final case class …`** in the parent to “wrap” a child message — that duplicates the protocol.
+- **`type AcceptedMessages`** — a **Scala 3 union** of every message **name** listed in **this** actor’s spec **`### Receives`** (resolve each name to the type in **`messages.scala`**) **plus** **private/internal** messages not named in the spec (timers, **`LLMActor`** / **`messageAdapter`** wiring).
+- **`Deps`**, **`def apply`**, behavior **`def`**s.
+- **Private** implementation messages (e.g. `private case class RetryTick`, LLM completion wrappers) — **not** duplicated in **`messages.scala`** if they are truly internal.
 
 ## `AcceptedMessages` union
 
 ```scala
-// Child Sends types are defined only in TheGatekeeper.scala / TheWorker.scala / …
+// Types PortPluginRequest, GatekeeperOutcome, … live in messages.scala (same package).
 type AcceptedMessages =
-  PortPluginRequest |
-  TheGatekeeper.GatekeeperResponse |
-  TheWorker.WorkerDone |
-  TheValidator.ValidatorOutcome
+  PortPluginRequest | GatekeeperOutcome | WorkerOutcome | ValidatorOutcome
 ```
+
 (Add **`| …`** for this actor’s private timer / **`LLMActor`** adapter types when the spec does not name them — see [library-api.md](library-api.md).)
 
 **Include:**
 
-1. Every **`### Receives`** type for **this** actor (defined in **this** file).
-2. Every **child message type** this parent must **`receiveMessage`** when a child **`tell`**s it — use the **types from the child’s companion** (import or FQCN), **not** new parent-local copies.
-3. **Internal-only** types for **this** actor (timers, LLM adapter mapping) when the spec does not name them.
-
-**Do not** define **`GatekeeperDone`**, **`GatekeeperPhaseCompleted`**, or similar **in the parent** if those names belong to the child’s protocol — they belong under **`object TheGatekeeper`** and are **imported** into the parent.
+1. Every **`### Receives`** **name** for **this** actor (types from **`messages.scala`**).
+2. **Internal-only** types for **this** actor when needed.
 
 ## Workflow → `def` behaviors
 
 - **`def apply(deps): Behavior[AcceptedMessages]`** — entry; delegates to the first workflow phase.
-- **Numbered steps** map to **named methods**: e.g. `def running(ctx: RunContext): Behavior[AcceptedMessages]`, `def awaitingValidator(attemptsLeft: Int, ...): Behavior[AcceptedMessages]`.
-- **Nested list items** (1.1, 1.2) are **inline** in the parent step or a **private def** if long — keep the parent def readable and parallel to the spec’s numbering in comments if helpful.
+- **Numbered steps** map to **named methods**: e.g. `def awaitingGatekeeper(...): Behavior[AcceptedMessages]`.
+- **Replies:** when the spec says **reply with \`Foo(...)\`**, **`Foo`** must appear under **some** actor’s **`### Receives`** that will receive it; implement **`someActorRef ! Foo(...)`** (often **`req.replyTo`**) using the type from **`messages.scala`**. No markdown link to the recipient is required at spec level.
+- **Nested list items** (1.1, 1.2) stay inline or in a **private def** if long.
 
-Example comment style:
+Example:
 
 ```scala
-// Workflow §4: Gatekeeper — match on types from TheGatekeeper (import or TheGatekeeper.*)
+// Workflow §4 — outcomes typed in messages.scala
 def awaitingGatekeeper(...): Behavior[AcceptedMessages] =
   Behaviors.receiveMessage:
-    case m: TheGatekeeper.GatekeeperResponse => ...
+    case m: GatekeeperOutcome => ...
 ```
 
 ## `(Agentic Step)` and subagents
 
-- **`Spawn the Subagent [The Gatekeeper](01-1-actor-the-gatekeeper.md)`** → `context.spawn(TheGatekeeper(deps), "gatekeeper-...")`; **`tell`** using **`TheGatekeeper`**’s **`### Receives`** types. When the child replies to the parent, it **`tell`**s **`TheGatekeeper`**’s **`### Sends`** (or workflow-internal types you placed under **`object TheGatekeeper`**). The parent’s **`AcceptedMessages`** includes those types via **`import TheGatekeeper.…`** / **`TheGatekeeper.*`** — **not** new case classes in the parent object.
-- Subagent specs are separate files — implement **`object TheGatekeeper`** there with **its own** `AcceptedMessages` derived from **that** spec only.
-- If the step is **`(Agentic Step)`** **without** a child actor (pure LLM on this actor’s workspace), use **`LLMActor.start[O]`** per [library-api.md](library-api.md).
+- **`Spawn the Subagent [The Gatekeeper](01-1-actor-the-gatekeeper.md)`** → `context.spawn(TheGatekeeper(deps), "gatekeeper-...")`. **`tell`** the child using **receive** types from **`messages.scala`** that match **The Gatekeeper**’s spec (e.g. **`GatekeeperRequest`**). The parent’s **`AcceptedMessages`** includes whatever **this** actor **receives back** from that child (listed in **this** actor’s `### Receives` as names → types from **`messages.md`**).
+- Subagent specs are separate files — **`object TheGatekeeper`** in **`TheGatekeeper.scala`** with **its own** **`AcceptedMessages`** (subset of **`messages.scala`** + internals).
+- Pure LLM on this actor (no child actor): **`LLMActor.start[O]`** per [library-api.md](library-api.md).
 
 ### `LLMActor` result type `O`
 
-**`LLMActor.start[O](replyTo, agent, inputPrompt, outputInstructions)`** ([source](../../../agents4s-pekko/src/main/scala/agents4s/pekko/LLMActor.scala)) delivers the model’s structured answer to **`replyTo`** as **`O`** on success (or **`LLMActor.LLMError`** on failure). That **`O`** is whatever you choose as the “success payload” for the step—you model it as a **Scala case class (or types uPickle can derive)** and you must supply **JSON serialization + schema** that the library uses to prompt the model and parse the result file:
-
-- **`ReadWriter`** (uPickle) — so the library can **`read[O]`** the JSON written by the agent.
-- **`JsonSchema`** (upickle-jsonschema) — so the library can embed a schema in the result prompt.
-
-**Typical setup** (minimal boilerplate):
+**`LLMActor.start[O](replyTo, agent, inputPrompt, outputInstructions)`** ([source](../../../agents4s-pekko/src/main/scala/agents4s/pekko/LLMActor.scala)) delivers **`O`** on success or **`LLMActor.LLMError`** on failure. **`O`** needs uPickle **`ReadWriter`** and **`JsonSchema`**.
 
 ```scala
 import upickle.default.*
@@ -94,16 +84,16 @@ case class MyStepResult(answer: String, confidence: Option[Double]) derives Read
 given JsonSchema[MyStepResult] = JsonSchema.derived
 ```
 
-Then **`LLMActor.start[MyStepResult](replyTo, ...)`** and adapt **`MyStepResult | LLMError`** into your **`AcceptedMessages`** (usually via **`messageAdapter`**). Full **`LLMActor`** wiring is in [library-api.md](library-api.md); **concrete examples of several `O` types** (imports + **`derives ReadWriter`** + **`given JsonSchema[...] = JsonSchema.derived`**) are in [`LLMActorIntegrationSpec.scala`](../../../agents4s-pekko/src/test/scala/agents4s/pekko/LLMActorIntegrationSpec.scala) (e.g. **`SimpleResult`** and the other result case classes at the top of the suite).
+Keep **`O`** **next to** **`LLMActor`** usage (private to the actor object) **or** in a small internal block — it is **not** part of the markdown **`### Receives`** protocol unless you also list it in a spec. See [library-api.md](library-api.md) and [`LLMActorIntegrationSpec.scala`](../../../agents4s-pekko/src/test/scala/agents4s/pekko/LLMActorIntegrationSpec.scala).
 
 ## Bounded loops
 
-When the spec says “return to step N at most K times”, carry **`attemptsLeft: Int`** (or **`attempt: Int`**) in **behavior parameters** — mirror the bound exactly.
+When the spec says “return to step N at most K times”, carry **`attemptsLeft: Int`** in **behavior parameters** — mirror the bound exactly.
 
 ## Layout (companion object messages)
 
-- **Tight-pack** each **sealed** family: no blank line between the `sealed trait` and its cases, nor between sibling cases of the same parent.
-- **One** blank line **only** between unrelated groups (different sealed trait, or jump from messages to `type AcceptedMessages` / `def apply`).
+- **Tight-pack** each **sealed** family in **`messages.scala`**: no blank line between the `sealed trait` and its cases.
+- **One** blank line **only** between unrelated groups in **`messages.scala`** or between the actor object’s **`type AcceptedMessages`** and **`def apply`**.
 
 ## Helper extraction
 
@@ -111,49 +101,50 @@ If a workflow step needs **non-obvious** parsing, path logic, or orchestration:
 
 - Add **`package <base>.<actorlowercase>`** (example: `com.example.getitpassing`).
 - **`GetItPassing.scala`** — `object GetItPassing`.
-- **`helpers.scala`** — top-level `def`s (and small pure types if needed). Split into a second helper file only when domains differ (e.g. `git.scala` vs `reporting.scala`).
-
-Actors with **short** workflows stay as **one file** under `<pkg>/GetItPassing.scala` without a subpackage.
+- **`helpers.scala`** — top-level `def`s. Split only when domains differ.
 
 ---
 
 ## Worked example (structural sketch)
 
-**Spec (abbreviated):** “Get It Passing” receives `PortPluginRequest`, sends `AlreadyPorted`, `Blocked`, `PortingComplete`, `PortingFailed`; workflow spawns Gatekeeper, Worker, Validator with retries.
+**Specs:** **`specs/messages.md`** defines **`PortPluginRequest`**, **`AlreadyPorted`**, **`Blocked`**, **`GatekeeperOutcome`**, … in full. **Get It Passing** lists **`PortPluginRequest`**, **`GatekeeperOutcome`**, … under **`### Receives`** (names only). **Port Plugin Client** lists **`AlreadyPorted`**, **`Blocked`**, … (names only). **`messages.scala`** is the union of **all** messages from **`messages.md`**.
 
-**Sketch** (not full — shows unions + defs). **`TheGatekeeper.GatekeeperResponse`** (and other gatekeeper messages) are **`import TheGatekeeper.*`** / FQCN here — **defined only** in **`TheGatekeeper.scala`**.
+**`messages.scala`** (abbreviated):
 
 ```scala
-// Spec: specs/01-0-actor-get-it-passing.md
+package com.example
+
+import org.apache.pekko.actor.typed.ActorRef
+
+// Generated from specs/messages.md — one definition each
+sealed trait PortPluginOutcome
+case object AlreadyPorted extends PortPluginOutcome
+final case class Blocked(reasons: List[BlockerReason]) extends PortPluginOutcome
+// ...
+
+final case class PortPluginRequest(
+    url: Option[java.net.URL],
+    localPath: Option[java.nio.file.Path],
+    replyTo: ActorRef[PortPluginOutcome],
+)
+
+sealed trait GatekeeperOutcome
+// ...
+```
+
+**`GetItPassing.scala`**:
+
+```scala
 package com.example
 
 import org.apache.pekko.actor.typed.*
 import org.apache.pekko.actor.typed.scaladsl.*
-import TheGatekeeper.GatekeeperResponse
 
 object GetItPassing:
 
-  sealed trait BlockerReason
-  final case class LibraryBlocker(org: String, name: String, notes: String) extends BlockerReason
-  final case class PluginBlocker(org: String, name: String, notes: String) extends BlockerReason
-  final case class OtherBlocker(notes: String) extends BlockerReason
+  type AcceptedMessages = PortPluginRequest | GatekeeperOutcome | WorkerOutcome | ValidatorOutcome
 
-  final case class PortPluginRequest(
-      url: Option[java.net.URL],
-      localPath: Option[java.nio.file.Path],
-      replyTo: ActorRef[PortPluginResponse]
-  )
-
-  sealed trait PortPluginResponse
-  case object AlreadyPorted extends PortPluginResponse
-  final case class Blocked(reasons: List[BlockerReason]) extends PortPluginResponse
-  final case class PortingComplete(reports: List[java.nio.file.Path]) extends PortPluginResponse
-  final case class PortingFailed(reports: List[java.nio.file.Path]) extends PortPluginResponse
-
-  // No duplicate child messages here — import TheWorker.…, TheValidator.… as needed.
-  type AcceptedMessages = PortPluginRequest | GatekeeperResponse /* | TheWorker.WorkerDone | … */
-
-  final class Deps(/* clones root, branch names, spawn Gatekeeper, ... */)
+  final class Deps(/* ... */)
 
   def apply(deps: Deps): Behavior[AcceptedMessages] =
     Behaviors.setup: context =>
@@ -162,20 +153,15 @@ object GetItPassing:
   private def idle(deps: Deps): Behavior[AcceptedMessages] =
     Behaviors.receiveMessage:
       case req: PortPluginRequest =>
-        // Workflow §2–3: clone, checkout — delegate to helpers if long
         awaitingGatekeeper(deps, req, attemptsLeft = 3)
       // ...
 
-  private def awaitingGatekeeper(
-      deps: Deps,
-      req: PortPluginRequest,
-      attemptsLeft: Int
-  ): Behavior[AcceptedMessages] =
+  private def awaitingGatekeeper(...): Behavior[AcceptedMessages] =
     Behaviors.receiveMessage:
-      case m: GatekeeperResponse => /* branch per spec §4 */
+      case m: GatekeeperOutcome => /* Workflow §4 */
         Behaviors.same
 
 end GetItPassing
 ```
 
-Implement **`TheGatekeeper`**, **`TheWorker`**, **`TheValidator`** in separate files with their own **`AcceptedMessages`** derived from **their** specs’ Receives/Sends and workflow.
+Implement **`TheGatekeeper`**, **`TheWorker`**, **`TheValidator`** in separate **`object`** files; each **`AcceptedMessages`** is a subset of **`messages.scala`** types **plus** private internals.

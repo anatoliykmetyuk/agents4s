@@ -46,11 +46,15 @@ def grade_text(assertion: str, text: str, use_skill: bool) -> tuple[bool, str]:
         )
         return ok, "References boilerplate (build.sbt / application.conf / classpath prompts)." if ok else "Missing boilerplate pointers."
 
-    if "actor-translation-guide" in a or ("receives" in a and "sends" in a):
+    if "actor-translation-guide" in a or ("messages.scala" in a and "receives" in a):
         ok = ("translation" in t or "actor-translation-guide" in t) and (
-            "receives" in t or "### receives" in t or "incoming" in t
+            "receives" in t
+            or "### receives" in t
+            or "messages.scala" in t.replace(" ", "")
+            or "messages.md" in t.replace(" ", "")
+            or "incoming" in t
         )
-        return ok, "Explains Receives/Sends → Scala types (translation guide)." if ok else "Weak mapping from Messaging Protocol."
+        return ok, "Explains messages.scala / messages.md / Receives → Scala types (translation guide)." if ok else "Weak mapping from Messaging Protocol."
 
     if "incremental" in a or "routing" in a:
         ok = "incremental" in t and ("parent" in t or "spawn" in t or "routing" in t)
@@ -89,10 +93,10 @@ def build_outputs() -> None:
     with_skill = {
         1: """# Harness plan (with actor-harness skill)
 
-1. **Discover specs:** Recursively scan `specs/` for files whose **first** `#` heading matches `# <Actor Name> Actor Specification`.
-2. **Scaffold** using `references/project-boilerplate.md`: `build.sbt` with `agents4s-pekko` and `agents4s-testkit` % Test, `scripts/setup.sh`, `run.sh`, `test.sh`, `application.conf`, `src/main/resources/prompts/`.
-3. **Per actor:** one `object` per spec. Define `type AcceptedMessages = MsgA | MsgB | ...` as a **Scala 3 union** of every `### Receives` message plus internal child/LLM completions.
-4. **Messaging Protocol → types:** follow `references/actor-translation-guide.md`: map `### Receives` / `### Sends` to case classes; add `replyTo` where needed.
+1. **Discover specs:** Read `specs/messages.md` (canonical message definitions). Recursively scan `specs/` for files whose **first** `#` heading matches `# <Actor Name> Actor Specification`.
+2. **Scaffold** using `references/project-boilerplate.md`: `build.sbt` with `agents4s-pekko` and `agents4s-testkit` % Test, `scripts/setup.sh`, `run.sh`, `test.sh`, `application.conf`, `src/main/resources/prompts/`, `specs/messages.md`.
+3. **messages.scala:** generate from `specs/messages.md`; **per actor:** parse name-only `### Receives` and map each name to a type in `messages.scala`. Define `type AcceptedMessages = MsgA | MsgB | ...` as a **Scala 3 union** of this actor’s receives plus internal child/LLM completions.
+4. **Messaging Protocol → types:** follow `references/actor-translation-guide.md`: full shapes in `messages.md`; actor specs list names only; Workflow replies name messages (e.g. `reply with Blocked(...)`) without `reply to [Actor](path)` links.
 5. **Main:** spawn the top-level actor from CLI/config.
 
 See `skills/actor-harness/SKILL.md` Steps 1–3.

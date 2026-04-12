@@ -3,12 +3,14 @@ name: actor-spec
 description: >
   Create a markdown actor specification from the user prompt. Edit existing
   actor specifications to conform to the best practices outlined in this skill.
-  Use this skill whenever the user asks to write, create, draft, or edit an
-  actor spec, agent spec, or actor specification; when they want to define a
-  new actor, add an actor to specs/, describe an actor's messages and workflow,
-  or convert a rough description of agent behavior into a structured spec file.
-  Also use when the user asks to review or improve an existing spec for clarity,
-  completeness, or consistency with the rest of the specs/ folder.
+  Protocol messages are defined in specs/messages.md; each actor spec lists
+  message names only under ### Receives. Use this skill whenever the user asks
+  to write, create, draft, or edit an actor spec, agent spec, or actor
+  specification; when they want to define a new actor, add an actor to specs/,
+  describe an actor's messages and workflow, or convert a rough description of
+  agent behavior into a structured spec file. Also use when the user asks to
+  review or improve an existing spec for clarity, completeness, or consistency
+  with the rest of the specs/ folder.
 ---
 
 # Actor Specification
@@ -17,11 +19,16 @@ You turn the user prompt into a markdown actor specification — the specificati
 
 ## Why these specs matter
 
-These specifications are the primary input to the **actor-harness** skill, which translates each actor spec into a runnable Scala 3 Pekko Typed actor. The harness maps messages to Scala types (including union-typed mailboxes), workflow steps to behavior logic, and subagent-spawning steps to child actor lifecycles. A well-written spec produces a clean actor with minimal manual fixup; a vague or inconsistent spec forces rework. Keep this downstream translation in mind — be concrete enough that someone (or a tool) reading the spec can produce the actor without guessing.
+These specifications are the primary input to the **actor-harness** skill, which generates **`messages.scala`** from **`specs/messages.md`** and builds each actor’s **`AcceptedMessages`** from that actor’s **`### Receives`** name list. Workflow steps can say **reply with \`MessageName(...)\`** without naming the recipient actor: the recipient must list that message name under **`### Receives`**, and the full type comes from **`messages.md`**. A well-written spec produces a clean actor with minimal manual fixup.
 
-## The Specification Format
+## Suite layout: `messages.md` + actor specs
 
-The specification follows this structure:
+- **`specs/messages.md`** — **Single source of truth** for all inter-actor messages: pseudocode signatures, payloads, glosses, shared ADTs. The harness turns this into **`messages.scala`**.
+- **Each actor spec** — **`## Messaging Protocol` → `### Receives`** lists **only message names** (backticks, one bullet per name). No payloads or descriptions here — those live in **`messages.md`** only.
+
+When you add or change a message, update **`messages.md`** and ensure every actor that can receive it includes that name in **`### Receives`**.
+
+## The actor specification format
 
 ```markdown
 # <Actor Name> Actor Specification
@@ -41,16 +48,15 @@ The purpose of the actor.
 
 ### Receives
 
-- `MessageName(payload: Type)` - Short description of what this message means and when it arrives.
-
-### Sends
-
-- `ResponseName(payload: Type)` - Short description of what this reply communicates.
+- `MessageName`
+- `AnotherMessage`
 
 ## Workflow
 
 A numbered, nested list of steps describing the workflow of the actor.
 ```
+
+Each **`### Receives`** line is **only** `` `MessageName` `` — the name must match a message defined in **`specs/messages.md`**.
 
 The specification should always start with the header `# <Actor Name> Actor Specification`. The purpose should be a single paragraph describing the actor's purpose. Write in second person ("Your purpose is to...") — these specs read as instructions to the actor, and the second-person voice makes intent unambiguous both for human readers and for LLM agents that may implement the actor's agentic steps.
 
@@ -60,13 +66,13 @@ Use **underscore italics** (`_Term_`) **only** for **project-specific defined te
 
 **Where definitions live**
 
-Every `_Term_` in **Actor Purpose**, **Messaging Protocol** (including message descriptions), or **Workflow** must be **defined somewhere readers can find**. Use **one** of these patterns:
+Every `_Term_` in **Actor Purpose**, **Messaging Protocol** (message names in **`### Receives`** do not need definitions — full shapes are in **`messages.md`**), or **Workflow** must be **defined somewhere readers can find**. Use **one** of these patterns:
 
 1. **Inline (default)** — `## Definitions` **immediately after** `## Actor Purpose` and **before** `## Messaging Protocol**, with one bullet per term: `- _Same Spelling_: short gloss`.
 
-2. **Suite definitions file** — when **either** the user tells you a path for definitions (create or update that file as needed) **or** you **discover** an existing definitions file in the `specs/` tree (e.g. `specs/definitions.md`, `specs/DEFINITIONS.md`, `specs/glossary.md`, or a name the project already uses). Then you **may omit** the full `## Definitions` bullet list **from this actor file**. Instead, **end `## Actor Purpose`** with a short, explicit pointer so nothing is ambiguous — for example:  
+2. **Suite definitions file** — when **either** the user tells you a path for definitions (create or update that file as needed) **or** you **discover** an existing definitions file in the `specs/` tree (e.g. `specs/definitions.md`, `specs/DEFINITIONS.md`, `specs/glossary.md`, or a name the project already uses). Then you **may omit** the full `## Definitions` bullet list **from this actor file**. Instead, **end `## Actor Purpose`** with a short, explicit pointer — for example:  
    `**Definition source:** all `_Term_` below are defined in [`specs/definitions.md`](specs/definitions.md).`  
-   Keep that shared file **complete**: every italic term used in **any** actor spec that points at it must appear there with a gloss. When you add new terms to an actor, update the shared file in the same edit.
+   Keep that shared file **complete**: every italic term used in **any** actor spec that points at it must appear there with a gloss.
 
 If there are **no** project-specific `_Term_` italics in those sections, you **omit** `## Definitions` and any definition-source line.
 
@@ -74,11 +80,17 @@ If there are **no** project-specific `_Term_` italics in those sections, you **o
 
 If the user later moves to inline definitions only, restore a full `## Definitions` section in each affected spec and trim redundant pointers.
 
-## Messaging Protocol
+## `specs/messages.md` — message definitions
 
-The messaging protocol has exactly two subsections, in this order: `### Receives` (messages from non-child actors) and `### Sends` (messages back to those actors). Only include types exchanged with external actors — omit messages used only with spawned children.
+Create or update **`specs/messages.md`** alongside actor specs. It holds **every** message the system uses, each defined **exactly once**.
 
-The messages are pseudocode in the form `MessageName(payload1: PayloadType1, ..., payloadN: PayloadTypeN)`. `MessageName` should describe intent in at most five words. Do not write full Scala implementations (no method bodies, no imports block).
+Suggested header:
+
+```markdown
+# Messages
+
+All inter-actor messages for this harness. Pseudocode only; the actor-harness skill maps these to Scala types in `messages.scala`.
+```
 
 ### Payload types: Scala first, flat, stdlib-only
 
@@ -90,17 +102,17 @@ The messages are pseudocode in the form `MessageName(payload1: PayloadType1, ...
 
 **Flat messages — avoid one-off wrappers**
 
-Keep payloads flat: use stdlib types directly in the message. For example, prefer `PortPluginRequest(url: java.net.URL)` over `PortPluginRequest(source: GitHubSource)` when `GitHubSource` is only a single-field wrapper around `java.net.URL`.
+Keep payloads flat: use stdlib types directly in the message.
 
 **When a custom ADT is OK**
 
-Introduce a named algebraic type (sealed-style variants in prose) only when the **same** shape is **reused across more than one message** in the protocol. Example: a `BlockerReason` shared by `Blocked(reasons: List[BlockerReason])` and `ValidationFailed(reason: BlockerReason)` documents domain semantics once and stays consistent. Do not invent wrappers that appear in a single message only.
+Introduce a named algebraic type (sealed-style variants in prose) only when the **same** shape is **reused across more than one message**.
 
-**Why:** The actor-harness skill turns these into Scala 3 traits and case classes. Noise types and third-party classes create boilerplate and dependency risk; flat stdlib-first payloads keep generated code small and predictable.
+**Why:** The actor-harness skill turns these into Scala 3 traits and case classes.
 
-### List layout for each message
+### List layout for each message in `messages.md`
 
-Under `### Receives` and `### Sends`, use a **markdown list**. **Each message is exactly one list line** — no line break between the signature and its gloss.
+**Each message is exactly one list line** — no line break between the signature and its gloss.
 
 **Required shape** (one line, ASCII hyphen between signature and gloss):
 
@@ -110,9 +122,22 @@ Under `### Receives` and `### Sends`, use a **markdown list**. **Each message is
 
 That is: a leading `- `, the pseudocode signature in backticks, then **space, hyphen, space**, then the gloss on the **same** line.
 
-Do **not** put the gloss on the following line or indent it under the signature; that reads as a broken list and is hard to scan. Do **not** use an em dash between signature and gloss here — use **ASCII hyphen** ` - ` so the pattern is uniform.
+Do **not** put the gloss on the following line or indent it under the signature. Do **not** use an em dash between signature and gloss — use **ASCII hyphen** ` - `.
 
-Keep each one-line gloss to at most one short sentence or two, or tighten with a semicolon if needed.
+## Messaging Protocol (actor spec)
+
+Under **`### Receives`**, list **only** message **names** that this actor’s mailbox accepts — each as a single line:
+
+```markdown
+### Receives
+
+- `PortPluginRequest`
+- `GatekeeperOutcome`
+```
+
+Every name must appear in **`specs/messages.md`** with the full signature. Include messages from external callers, **child** actors, and peers.
+
+**Do not** add `### Sends`. Replies use message types defined in **`messages.md`**; the receiving actor lists that message name under **`### Receives`**.
 
 ## Workflow
 
@@ -122,13 +147,15 @@ Each step of the workflow should be chunked and scoped to the purpose of the act
 
 ### Workflow patterns
 
-The following patterns appear frequently in well-written workflows. Read [examples/01-0-actor-get-it-passing.md](examples/01-0-actor-get-it-passing.md) for a complete illustration showing all of them in context.
+The following patterns appear frequently in well-written workflows. Read [examples/01-0-actor-get-it-passing.md](examples/01-0-actor-get-it-passing.md) and [examples/messages.md](examples/messages.md) for a complete illustration.
 
-**Defined terms.** Mark project-specific concepts with `_Term_` and ensure **every such term** is listed either in this file’s `## Definitions` or in the **suite definitions file** you cite at the end of Actor Purpose (see above). Do not italicize a term in Purpose, Messaging Protocol, or Workflow unless it is covered by one of those two places.
+**Defined terms.** Mark project-specific concepts with `_Term_` and ensure **every such term** is listed either in this file’s `## Definitions` or in the **suite definitions file** you cite at the end of Actor Purpose (see above).
 
-**Concrete commands.** When a step involves a specific shell command, include it inline in backticks — e.g., "Check it out via `git checkout <_Default Branch_>`." This removes ambiguity about what "update the branch" means in practice.
+**Concrete commands.** When a step involves a specific shell command, include it inline in backticks.
 
-**Conditional branching.** When a step has different outcomes, spell out each branch explicitly: "If it has cleared the porting, proceed with the next steps. If it has denied porting, stop the workflow here and report to the requesting agent with a corresponding message according to your messaging protocol."
+**Conditional branching.** When a step has different outcomes, spell out each branch explicitly.
+
+**Replies.** To send a reply, name the message and payload as in **`messages.md`**, e.g. **reply with \`Blocked(reasons)\`** or **tell \`replyTo\` with \`PortingComplete(reports)\`**. You do **not** need to link the recipient actor — the recipient’s **`### Receives`** must include that message name; the harness resolves the full type from **`messages.md`**.
 
 **Bounded loops.** When a step can be retried, state the bound: "go back to step 6... It is possible to return to step 6 no more than 3 times." Without an explicit bound, the actor-harness skill cannot know when to give up.
 
@@ -149,16 +176,17 @@ Subagent Name is the name of the subagent and the path is the path to the subage
 
 ## File Naming
 
-Infer the naming convention from the existing files in the `specs/` folder or from the user's prompt. If neither provides a clear convention, ask the user before creating the file.
+Infer the naming convention from the existing files in the `specs/` folder or from the user's prompt. **`messages.md`** is the conventional name for the shared message catalog; keep it at **`specs/messages.md`** unless the project already uses another agreed name.
 
 ## Rules for Writing Specifications
 
-- Keep it concise — no longer than 100 lines.
+- Keep each **actor** spec concise — no longer than 100 lines.
 - Each actor should do one specific job. Split complex jobs into multiple actors.
 - Use precise language — avoid generalizations, omissions, ambiguity.
 - Write in second person ("Your purpose is to...").
-- If you use `_Term_` in Actor Purpose, Messaging Protocol, or Workflow, either add `## Definitions` (after Purpose, before Messaging) with every term, **or** point to a shared definitions file under `specs/` (user-provided or existing) at the end of Actor Purpose and maintain that file — no undefined italics.
-- In **Messaging Protocol**, each Receives/Sends message is **one** list line: pseudocode signature in backticks, then a space, ASCII hyphen, space, then the gloss — all on the same line; never wrap the gloss onto the next line.
+- If you use `_Term_` in Actor Purpose or Workflow, either add `## Definitions` (after Purpose, before Messaging) with every term, **or** point to a shared definitions file under `specs/` at the end of Actor Purpose — no undefined italics.
+- **`### Receives`:** one bullet per message name in backticks only (e.g. `- `PortPluginRequest``) — no payloads; definitions live in **`messages.md`**.
+- Keep **`messages.md`** complete and consistent: every name listed in any actor’s **`### Receives`** has a full definition line in **`messages.md`**.
 
 ## Evals
 

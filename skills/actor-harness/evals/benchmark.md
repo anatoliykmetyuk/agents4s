@@ -1,7 +1,7 @@
 # Skill Benchmark: actor-harness
 
 **Model**: <model-name>
-**Date**: 2026-04-12T03:57:00Z
+**Date**: 2026-04-12T05:59:17Z
 **Evals**: 1, 2, 3 (3 runs each per configuration)
 
 ## Summary

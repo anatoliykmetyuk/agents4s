@@ -93,13 +93,15 @@ out/
 
 ## Directory layout (reference)
 
-Actor-spec harnesses typically use **one Scala file per actor object**. If an actor needs **helper modules**, add a **subpackage** named after that actor (lower case) containing **`ActorName.scala`** + **`helpers.scala`** (see **Step 4** in `SKILL.md`).
+Actor-spec harnesses use **`specs/messages.md`** as the **canonical** definition of all inter-actor messages; **`messages.scala`** is generated from it. Each actor spec lists **message names only** under **`### Receives`**; **one Scala file per actor object**. If an actor needs **helper modules**, add a **subpackage** named after that actor (lower case) containing **`ActorName.scala`** + **`helpers.scala`** (see **Step 4** in `SKILL.md`).
 
 ```
 my-harness/
 ├── specs/
+│   └── messages.md        # full message signatures & ADTs (source for messages.scala)
 ├── scripts/
 ├── src/main/scala/<pkg>/
+│   ├── messages.scala         # shared protocol types (from specs/messages.md)
 │   ├── Main.scala
 │   ├── GetItPassing.scala
 │   └── getitpassing/          # optional per-actor package
