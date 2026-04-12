@@ -32,7 +32,7 @@ Inter-actor messages are defined **once** in the suite’s message-definitions m
 Each **`object <ActorName>`** (in **`<ActorName>.scala`**) holds:
 
 - **`type AcceptedMessages`** — a **Scala 3 union** of every message **name** listed in **this** actor’s spec **`## Receives`** (resolve each name to the type in **`messages.scala`**) **plus** **private/internal** messages not named in the spec (timers, **`LLMActor`** / **`messageAdapter`** wiring).
-- **`Deps`**, **`def apply`**, behavior **`def`**s.
+- **`def apply`**, behavior **`def`**s — dependencies are **plain parameters** on **`apply`** (threaded through private behavior methods as needed); no separate **`Deps`** type.
 - **Private** implementation messages (e.g. `private case class RetryTick`, LLM completion wrappers) — **not** duplicated in **`messages.scala`** if they are truly internal.
 
 ## `AcceptedMessages` union
@@ -52,7 +52,7 @@ type AcceptedMessages =
 
 ## Workflow → `def` behaviors
 
-- **`def apply(deps): Behavior[AcceptedMessages]`** — entry; delegates to the first workflow phase.
+- **`def apply`(**…**): `Behavior[AcceptedMessages]`** — entry; dependencies as **plain parameters** (not a `Deps` wrapper); delegates to the first workflow phase.
 - **Numbered steps** map to **named methods**: e.g. `def awaitingGatekeeper(...): Behavior[AcceptedMessages]`.
 - **Replies:** when the spec says **reply with \`Foo(...)\`**, **`Foo`** must appear under **some** actor’s **`## Receives`** that will receive it; implement **`someActorRef ! Foo(...)`** (often **`req.replyTo`**) using the type from **`messages.scala`**. No markdown link to the recipient is required at spec level.
 - **Nested list items** (1.1, 1.2) stay inline or in a **private def** if long.
@@ -68,7 +68,7 @@ def awaitingGatekeeper(...): Behavior[AcceptedMessages] =
 
 ## `(Agentic Step)` and subagents
 
-- **`Spawn the Subagent [The Gatekeeper](03-actor-the-gatekeeper.md)`** → `context.spawn(TheGatekeeper(deps), "gatekeeper-...")`. **`tell`** the child using **receive** types from **`messages.scala`** that match **The Gatekeeper**’s spec (e.g. **`GatekeeperRequest`**). The parent’s **`AcceptedMessages`** includes whatever **this** actor **receives back** from that child (listed in **this** actor’s `## Receives` as names → types from **`messages.scala`**).
+- **`Spawn the Subagent [The Gatekeeper](03-actor-the-gatekeeper.md)`** → `context.spawn(TheGatekeeper(agent, workspace, …), "gatekeeper-...")` (pass the same dependencies you take on **`apply`**). **`tell`** the child using **receive** types from **`messages.scala`** that match **The Gatekeeper**’s spec (e.g. **`GatekeeperRequest`**). The parent’s **`AcceptedMessages`** includes whatever **this** actor **receives back** from that child (listed in **this** actor’s `## Receives` as names → types from **`messages.scala`**).
 - Subagent specs are separate files — **`object TheGatekeeper`** in **`TheGatekeeper.scala`** with **its own** **`AcceptedMessages`** (subset of **`messages.scala`** + internals).
 - Pure LLM on this actor (no child actor): **`LLMActor.start[O]`** per [library-api.md](library-api.md).
 
@@ -137,6 +137,7 @@ sealed trait GatekeeperOutcome
 ```scala
 package com.example
 
+import agents4s.cursor.CursorAgent
 import org.apache.pekko.actor.typed.*
 import org.apache.pekko.actor.typed.scaladsl.*
 
@@ -144,16 +145,18 @@ object GetItPassing:
 
   type AcceptedMessages = PortPluginRequest | GatekeeperOutcome | WorkerOutcome | ValidatorOutcome
 
-  final class Deps(/* ... */)
-
-  def apply(deps: Deps): Behavior[AcceptedMessages] =
+  def apply(agent: CursorAgent, workspace: java.nio.file.Path): Behavior[AcceptedMessages] =
     Behaviors.setup: context =>
-      idle(deps)
+      idle(agent, workspace, context)
 
-  private def idle(deps: Deps): Behavior[AcceptedMessages] =
+  private def idle(
+      agent: CursorAgent,
+      workspace: java.nio.file.Path,
+      context: ActorContext[AcceptedMessages],
+  ): Behavior[AcceptedMessages] =
     Behaviors.receiveMessage:
       case req: PortPluginRequest =>
-        awaitingGatekeeper(deps, req, attemptsLeft = 3)
+        awaitingGatekeeper(agent, workspace, context, req, attemptsLeft = 3)
       // ...
 
   private def awaitingGatekeeper(...): Behavior[AcceptedMessages] =
