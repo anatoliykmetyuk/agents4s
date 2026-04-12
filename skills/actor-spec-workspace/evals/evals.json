@@ -1,0 +1,50 @@
+{
+  "skill_name": "actor-spec",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Write a spec for an actor that watches a directory for new CSV files, validates their schema against a known set of expected columns, and moves valid files to an output directory. Invalid files should be moved to a quarantine directory with a rejection report.",
+      "expected_output": "A single actor spec with Purpose, Messaging Protocol, and Workflow sections. Should include defined terms for directories, concrete file operations, and conditional branching for valid/invalid paths.",
+      "files": [],
+      "assertions": [
+        {"text": "Has '# ... Actor Specification' title heading", "type": "structural"},
+        {"text": "Has '## Actor Purpose' section", "type": "structural"},
+        {"text": "Has '## Messaging Protocol' section with receive and respond messages", "type": "structural"},
+        {"text": "Has '## Workflow' section with numbered steps", "type": "structural"},
+        {"text": "Uses second-person voice ('Your purpose is to...' or 'You...')", "type": "quality"},
+        {"text": "Uses italicized defined terms for project-specific concepts", "type": "quality"},
+        {"text": "Has conditional branching (valid vs invalid file handling)", "type": "quality"},
+        {"text": "Spec is under 100 lines", "type": "constraint"}
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I need a spec for an orchestrator that coordinates three workers to process a batch of images — resizing, watermarking, and uploading — with up to 2 retries per image if any worker fails.",
+      "expected_output": "An orchestrator spec plus three subagent specs. The orchestrator should use Spawn Subagent pattern with markdown links, have bounded retry logic, and delegate each stage to a child actor.",
+      "files": [],
+      "assertions": [
+        {"text": "Main spec has '# ... Actor Specification' title heading", "type": "structural"},
+        {"text": "Main spec uses 'Spawn the Subagent [Name](path)' pattern with markdown links for child actors", "type": "structural"},
+        {"text": "Has explicit retry bound (up to 2 retries / 3 attempts)", "type": "quality"},
+        {"text": "Creates separate subagent spec files for workers (not inline)", "type": "structural"},
+        {"text": "Uses second-person voice", "type": "quality"},
+        {"text": "Each spec is under 100 lines", "type": "constraint"}
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Create a spec for an actor that receives a PR diff and uses an LLM to generate a code review, then posts the review as GitHub comments. The actor should first analyze the diff to identify files worth reviewing, then spawn an LLM-based reviewer subagent for the actual review generation, and finally post the comments via the GitHub API.",
+      "expected_output": "A main actor spec plus an LLM reviewer subagent spec. The main spec should have file filtering logic, spawn the LLM subagent, and handle GitHub API posting. The subagent should describe the LLM invocation.",
+      "files": [],
+      "assertions": [
+        {"text": "Main spec has '# ... Actor Specification' title heading", "type": "structural"},
+        {"text": "Main spec uses 'Spawn the Subagent [Name](path)' pattern for LLM reviewer", "type": "structural"},
+        {"text": "Identifies the LLM step as delegated to a child actor (not done inline)", "type": "quality"},
+        {"text": "Creates a separate subagent spec file for the LLM reviewer", "type": "structural"},
+        {"text": "Uses second-person voice", "type": "quality"},
+        {"text": "Has conditional branching for API failure handling", "type": "quality"},
+        {"text": "Each spec is under 100 lines", "type": "constraint"}
+      ]
+    }
+  ]
+}

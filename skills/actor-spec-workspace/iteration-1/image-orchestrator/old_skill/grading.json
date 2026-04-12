@@ -1,0 +1,36 @@
+{
+  "eval_id": 2,
+  "eval_name": "image-orchestrator",
+  "expectations": [
+    {
+      "text": "Main spec has '# ... Actor Specification' title heading",
+      "passed": true,
+      "evidence": "Found: # Image Batch Orchestrator Actor Specification"
+    },
+    {
+      "text": "Main spec uses 'Spawn the Subagent [Name](path)' pattern with markdown links for child actors",
+      "passed": true,
+      "evidence": "Found: Spawn the Subagent [Image Resize Worker](image-resize-worker-spec.md)"
+    },
+    {
+      "text": "Has explicit retry bound (up to 2 retries / 3 attempts)",
+      "passed": true,
+      "evidence": "Found explicit retry bound"
+    },
+    {
+      "text": "Creates separate subagent spec files for workers (not inline)",
+      "passed": true,
+      "evidence": "Found 3 separate subagent spec file(s): image-resize-worker-spec.md, image-upload-worker-spec.md, image-watermark-worker-spec.md"
+    },
+    {
+      "text": "Uses second-person voice",
+      "passed": false,
+      "evidence": "No second-person voice detected in purpose section"
+    },
+    {
+      "text": "Each spec is under 100 lines",
+      "passed": true,
+      "evidence": "image-orchestrator-spec.md: 50 lines; image-resize-worker-spec.md: 29 lines; image-upload-worker-spec.md: 29 lines; image-watermark-worker-spec.md: 29 lines"
+    }
+  ]
+}

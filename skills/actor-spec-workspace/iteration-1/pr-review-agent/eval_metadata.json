@@ -1,0 +1,14 @@
+{
+  "eval_id": 3,
+  "eval_name": "pr-review-agent",
+  "prompt": "Create a spec for an actor that receives a PR diff and uses an LLM to generate a code review, then posts the review as GitHub comments. The actor should first analyze the diff to identify files worth reviewing, then spawn an LLM-based reviewer subagent for the actual review generation, and finally post the comments via the GitHub API.",
+  "assertions": [
+    {"text": "Main spec has '# ... Actor Specification' title heading", "type": "structural"},
+    {"text": "Main spec uses 'Spawn the Subagent [Name](path)' pattern for LLM reviewer", "type": "structural"},
+    {"text": "Identifies the LLM step as delegated to a child actor (not done inline)", "type": "quality"},
+    {"text": "Creates a separate subagent spec file for the LLM reviewer", "type": "structural"},
+    {"text": "Uses second-person voice", "type": "quality"},
+    {"text": "Has conditional branching for API failure handling", "type": "quality"},
+    {"text": "Each spec is under 100 lines", "type": "constraint"}
+  ]
+}
