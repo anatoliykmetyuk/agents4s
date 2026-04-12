@@ -14,9 +14,9 @@ rm -rf ~/.agents/skills/actor-spec 2>/dev/null || true
 rm -rf ~/.cursor/skills/actor-spec 2>/dev/null || true
 
 echo "Installing harness skill from local source..."
-npx skills add "$REPO_ROOT" -g -a cursor --skill harness -y
+npx --yes skills add "$REPO_ROOT" -g -a cursor --skill harness -y
 
 echo "Installing actor-spec skill from local source..."
-npx skills add "$REPO_ROOT" -g -a cursor --skill actor-spec -y
+npx --yes skills add "$REPO_ROOT" -g -a cursor --skill actor-spec -y
 
 echo "Done! The harness and actor-spec skills are installed. Re-run this script after editing skills/harness/ or skills/actor-spec/."
