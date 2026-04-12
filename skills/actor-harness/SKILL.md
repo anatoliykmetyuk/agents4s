@@ -37,14 +37,15 @@ my-harness/
 │   ├── setup.sh
 │   ├── run.sh
 │   └── test.sh
-├── prompts/               # task templates for agentic steps ({{TOKENS}})
 ├── src/main/scala/<pkg>/
 │   ├── Main.scala
 │   ├── GetItPassing.scala    # one object per actor (example names)
 │   └── getitpassing/         # optional: package for one actor + helpers
 │       ├── GetItPassing.scala
 │       └── helpers.scala
-├── src/main/resources/application.conf
+├── src/main/resources/
+│   ├── application.conf
+│   └── prompts/             # task templates for agentic steps ({{TOKENS}}); classpath resources
 ├── build.sbt
 └── out/                     # gitignored artifacts
 ```
@@ -99,7 +100,11 @@ For Workflow lines that start with **`(Agentic Step)`** (or that spawn an LLM-dr
 - Define **`O`** with uPickle **`ReadWriter`** and **`JsonSchema`** (see [references/library-api.md](references/library-api.md)).
 - **Own the `Agent`:** call **`agent.stop()`** when the LLM child terminates — **`LLMActor`** does **not** stop the agent for you (use **`context.watchWith`** or equivalent).
 - **Do not** call **`agent.awaitIdle` / `sendPrompt` / `start`** from the parent’s **`receiveMessage`** thread; use **`LLMActor`** for the LLM session.
-- Put **task** text in **`prompts/*.md`** and load with **`PromptTemplate.load`**; structured field meanings go in **`outputInstructions`**.
+- Put **task** text in **`src/main/resources/prompts/`** (e.g. `inspect.md`, `gatekeeper.md`) so sbt packages them as **classpath** resources. Load with **`agents4s.prompt.PromptTemplate`**:
+  - **`PromptTemplate.load(name, values)`** — loads the resource **`prompts/<name>`** (via the context class loader), then replaces **`{{KEY}}`** placeholders using **`substitute`** and the `values` map. Example: **`PromptTemplate.load("inspect.md", Map("ITEM_ID" -> id, "WORKSPACE" -> ws))`**.
+  - **`PromptTemplate.loadResource(name)`** — template body only (no substitution); same **`prompts/<name>`** classpath path.
+  - Do **not** keep editable templates only under a repo-root `prompts/` folder unless you copy them into `src/main/resources/prompts/` for the packaged app/tests.
+- Structured field meanings go in **`outputInstructions`** (not only in the markdown file). Details and API table: [references/library-api.md](references/library-api.md) (`PromptTemplate` section).
 
 ## Step 6 — Wire `Main`
 
@@ -117,7 +122,7 @@ Implementing agents should rely on **[references/library-api.md](references/libr
 
 - [ ] `specs/` scanned; only **`# ... Actor Specification`** files become actors; supporting defs/glossary files read for context.
 - [ ] **One object per actor spec**; **`AcceptedMessages`** union includes receives + internal/child completions (+ LLM completions).
-- [ ] **`(Agentic Step)`** lines use **`LLMActor`** + **`CursorAgent`**, default model **`composer-2-fast`** unless overridden.
+- [ ] **`(Agentic Step)`** lines use **`LLMActor`** + **`CursorAgent`**, default model **`composer-2-fast`** unless overridden; task templates under **`src/main/resources/prompts/`** loaded with **`PromptTemplate.load`** / **`loadResource`**.
 - [ ] Parent **`stop()`**s **`CursorAgent`** when the run is done; helpers live in actor subpackage when needed.
 - [ ] `scripts/setup.sh`, `scripts/run.sh`, `scripts/test.sh` exist; `build.sbt` includes **`agents4s-pekko`** and **`agents4s-testkit`** `% Test`.
 - [ ] `out/` gitignored; `./scripts/test.sh` passes.

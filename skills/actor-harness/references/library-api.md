@@ -91,10 +91,12 @@ given JsonSchema[InspectionResult] = JsonSchema.derived
 
 ## `agents4s.prompt.PromptTemplate`
 
+Templates are files under **`src/main/resources/prompts/`** in the harness project; at runtime they appear on the classpath as **`prompts/<name>`** (e.g. `src/main/resources/prompts/inspect.md` → load with **`load("inspect.md", ...)`**).
+
 | API | Role |
 |-----|------|
 | `substitute(template, Map("KEY" -> value))` | Replace `{{KEY}}` in a string. |
-| `loadResource(name)` | Load `prompts/<name>` from classpath. |
+| `loadResource(name)` | Load bytes from classpath resource **`prompts/<name>`** (UTF-8). |
 | `load(name, values)` | `loadResource` + `substitute`. |
 
 ---

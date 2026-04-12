@@ -39,9 +39,9 @@
           "evidence": "Output defines AcceptedMessages as a Scala 3 union."
         },
         {
-          "text": "project-boilerplate.md documents build.sbt, scripts, application.conf, and prompts/",
+          "text": "project-boilerplate.md documents build.sbt, scripts, application.conf, and classpath prompts under src/main/resources/prompts/",
           "passed": true,
-          "evidence": "References boilerplate (build.sbt / application.conf / prompts)."
+          "evidence": "References boilerplate (build.sbt / application.conf / classpath prompts)."
         },
         {
           "text": "actor-translation-guide.md explains Receives/Sends \u2192 Scala types and union construction",
@@ -138,7 +138,7 @@
           "evidence": "Missing union-based AcceptedMessages."
         },
         {
-          "text": "project-boilerplate.md documents build.sbt, scripts, application.conf, and prompts/",
+          "text": "project-boilerplate.md documents build.sbt, scripts, application.conf, and classpath prompts under src/main/resources/prompts/",
           "passed": false,
           "evidence": "Missing boilerplate pointers."
         },

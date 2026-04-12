@@ -44,7 +44,7 @@ def grade_text(assertion: str, text: str, use_skill: bool) -> tuple[bool, str]:
         ok = ("project-boilerplate" in t or "project-boilerplate.md" in t) and (
             "build.sbt" in t or "application.conf" in t
         )
-        return ok, "References boilerplate (build.sbt / application.conf / prompts)." if ok else "Missing boilerplate pointers."
+        return ok, "References boilerplate (build.sbt / application.conf / classpath prompts)." if ok else "Missing boilerplate pointers."
 
     if "actor-translation-guide" in a or ("receives" in a and "sends" in a):
         ok = ("translation" in t or "actor-translation-guide" in t) and (
@@ -90,7 +90,7 @@ def build_outputs() -> None:
         1: """# Harness plan (with actor-harness skill)
 
 1. **Discover specs:** Recursively scan `specs/` for files whose **first** `#` heading matches `# <Actor Name> Actor Specification`.
-2. **Scaffold** using `references/project-boilerplate.md`: `build.sbt` with `agents4s-pekko` and `agents4s-testkit` % Test, `scripts/setup.sh`, `run.sh`, `test.sh`, `application.conf`, `prompts/`.
+2. **Scaffold** using `references/project-boilerplate.md`: `build.sbt` with `agents4s-pekko` and `agents4s-testkit` % Test, `scripts/setup.sh`, `run.sh`, `test.sh`, `application.conf`, `src/main/resources/prompts/`.
 3. **Per actor:** one `object` per spec. Define `type AcceptedMessages = MsgA | MsgB | ...` as a **Scala 3 union** of every `### Receives` message plus internal child/LLM completions.
 4. **Messaging Protocol → types:** follow `references/actor-translation-guide.md`: map `### Receives` / `### Sends` to case classes; add `replyTo` where needed.
 5. **Main:** spawn the top-level actor from CLI/config.
@@ -109,7 +109,7 @@ Update the **parent** only: extend its `AcceptedMessages` union, `context.spawn`
 
 For `(Agentic Step)` use **`LLMActor.start[O](...)`** with **`CursorAgent`**. Default model **`composer-2-fast`** unless overridden.
 
-Use `context.messageAdapter[O | LLMActor.LLMError]` into your `AcceptedMessages`. Define `O` with `ReadWriter` + `JsonSchema.derived`. Task text in `prompts/*.md` via `PromptTemplate.load`; field semantics in `outputInstructions`.
+Use `context.messageAdapter[O | LLMActor.LLMError]` into your `AcceptedMessages`. Define `O` with `ReadWriter` + `JsonSchema.derived`. Task text: files under `src/main/resources/prompts/` loaded via `PromptTemplate.load("….md", Map(...))`; field semantics in `outputInstructions`.
 
 **Do not** call `awaitIdle` / `sendPrompt` / `start` on the **parent** `receiveMessage` thread — only inside `LLMActor`. Parent must `agent.stop()` after the child stops (`watchWith`).
 

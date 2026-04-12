@@ -61,7 +61,7 @@ The **actor-harness** skill turns a **`specs/`** directory (**actor-spec** markd
 - **Hybrid workflow:** rote steps are **Scala** in actor behaviors; judgment-heavy steps use **`agents4s.cursor.CursorAgent`** via **`agents4s.pekko.LLMActor`** (heartbeat-driven child actor, not the parent dispatcher).
 - **Message layout:** each actor’s messages live in its **`object ActorName`**; accepted mailboxes use **Scala 3 union types** (`Message1 | Message2 | …`) aligned with the spec’s **Messaging Protocol** and child completions.
 - **Traceability:** add `// Spec: specs/…` in generated Scala to point at the source actor specification.
-- **Project shape:** generated harnesses use **`scripts/setup.sh`**, **`scripts/run.sh`**, **`scripts/test.sh`** (repo root), **`prompts/`** for agentic templates, and **`skills/actor-harness/references/`** (`project-boilerplate.md`, `actor-translation-guide.md`, `library-api.md`, `testing.md`). Pair with **`skills/actor-spec/`** for writing specs.
+- **Project shape:** generated harnesses use **`scripts/setup.sh`**, **`scripts/run.sh`**, **`scripts/test.sh`** (repo root), **`src/main/resources/prompts/`** for agentic templates (classpath-loaded via **`PromptTemplate`**), and **`skills/actor-harness/references/`** (`project-boilerplate.md`, `actor-translation-guide.md`, `library-api.md`, `testing.md`). Pair with **`skills/actor-spec/`** for writing specs.
 
 Read **`skills/actor-harness/SKILL.md`** for the full workflow. Install the skills globally:
 

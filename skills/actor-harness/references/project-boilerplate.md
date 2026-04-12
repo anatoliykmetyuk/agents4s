@@ -99,20 +99,23 @@ Actor-spec harnesses typically use **one Scala file per actor object**. If an ac
 my-harness/
 ├── specs/
 ├── scripts/
-├── prompts/
 ├── src/main/scala/<pkg>/
 │   ├── Main.scala
 │   ├── GetItPassing.scala
 │   └── getitpassing/          # optional per-actor package
 │       ├── GetItPassing.scala
 │       └── helpers.scala
-├── src/main/resources/application.conf
+├── src/main/resources/
+│   ├── application.conf
+│   └── prompts/               # task templates — classpath (PromptTemplate loads prompts/<file>)
 ├── src/test/scala/<pkg>/
 ├── build.sbt
 └── project/build.properties
 ```
 
 ## Prompt template example (task prompt only)
+
+Store templates under **`src/main/resources/prompts/`** so they are on the **classpath** at **`prompts/<filename>`** (required for **`PromptTemplate.load`** / **`loadResource`**).
 
 The **task** prompt describes what the model should do in the workspace. **`LLMActor`** adds a separate **result** prompt with JSON path and schema; describe output **fields** in code via **`outputInstructions`**, not necessarily in this file.
 

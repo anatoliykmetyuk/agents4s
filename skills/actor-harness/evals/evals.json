@@ -9,7 +9,7 @@
       "assertions": [
         {"text": "SKILL.md instructs scanning specs for `# ... Actor Specification` first heading", "type": "structural"},
         {"text": "SKILL.md defines AcceptedMessages as Scala 3 union of receives + internal/LLM completions", "type": "structural"},
-        {"text": "project-boilerplate.md documents build.sbt, scripts, application.conf, and prompts/", "type": "structural"},
+        {"text": "project-boilerplate.md documents build.sbt, scripts, application.conf, and classpath prompts under src/main/resources/prompts/", "type": "structural"},
         {"text": "actor-translation-guide.md explains Receives/Sends → Scala types and union construction", "type": "structural"}
       ]
     },
@@ -26,7 +26,7 @@
     {
       "id": 3,
       "prompt": "Implement only the agentic slice: one actor workflow step is `(Agentic Step)` and must use CursorAgent + LLMActor with structured JSON output. Use default model unless I say otherwise.",
-      "expected_output": "LLMActor.start, messageAdapter, O with ReadWriter+JsonSchema, composer-2-fast default, PromptTemplate under prompts/, agent.stop ownership; details in library-api.md.",
+      "expected_output": "LLMActor.start, messageAdapter, O with ReadWriter+JsonSchema, composer-2-fast default, PromptTemplate + src/main/resources/prompts/, agent.stop ownership; details in library-api.md.",
       "files": [],
       "assertions": [
         {"text": "SKILL.md Step 5 specifies LLMActor + CursorAgent and default model composer-2-fast", "type": "structural"},

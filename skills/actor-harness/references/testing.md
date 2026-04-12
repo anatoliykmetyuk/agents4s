@@ -114,7 +114,7 @@ No **`blocking-llm-dispatcher`** is required for this pattern.
 
 - One `ActorTestKit` per test class (`afterAll`: `testKit.shutdownTestKit()`).
 - Reuse a helper `def tmpWorkspace: java.nio.file.Path` for workspace-root tests.
-- Keep **prompt templates** under `prompts/` in fixture dirs only if assertions need template text.
+- Keep **prompt templates** under `src/test/resources/prompts/` (classpath `prompts/…`) when tests need real **`PromptTemplate.load`** behavior; otherwise stub the task string.
 
 ## Checklist
 
