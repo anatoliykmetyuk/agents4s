@@ -179,7 +179,7 @@ The following patterns appear frequently in well-written workflows. Read [exampl
 1. **`reply to \`replyTo\` with \`Message(...)\`** — use the **`replyTo`** (or equivalent) **field name** from the **incoming request** in **`messages.md`** (if the catalog uses `sender`, `clientRef`, etc., use that exact name in the prose).
 2. **`Spawn the Subagent [Name](path/to/actor-spec.md)`** — create a child actor; link to its spec with a markdown path. State what the child does, which reply messages the parent receives (names from **`messages.md`**), and nested substeps for each reply branch (see **Subagent delegation** below).
 
-Do **not** use **“emit”**, **“send”**, or bare **“reply with \`Message(...)\`”** outside these two patterns.
+Do **not** use **“emit”**, **“send”**, or bare **“reply with \`Message(...)\`”** or other language that omits the recipient outside these two patterns.
 
 Examples:
 
