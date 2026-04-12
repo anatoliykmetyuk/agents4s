@@ -19,7 +19,7 @@ You turn the user prompt into a markdown actor specification — the specificati
 
 ## Why these specs matter
 
-These specifications are the primary input to the **actor-harness** skill, which generates **`messages.scala`** from **`specs/messages.md`** and builds each actor’s **`AcceptedMessages`** from that actor’s **`## Receives`** name list. Workflow steps that **send** a message must **name the recipient explicitly** (see **Replies** below). The harness and human readers must never infer who receives an outbound message. A well-written spec produces a clean actor with minimal manual fixup.
+These specifications are the primary input to the **actor-harness** skill, which generates **`messages.scala`** from **`specs/messages.md`** and builds each actor’s **`AcceptedMessages`** from that actor’s **`## Receives`** name list. Workflow steps that **send** a message must **name the recipient explicitly** (see **Outbound messages** below). The harness and human readers must never infer who receives an outbound message. A well-written spec produces a clean actor with minimal manual fixup.
 
 ## Suite layout: `messages.md` + actor specs
 
@@ -32,8 +32,8 @@ When you add or change a message, update **`messages.md`** and ensure every acto
 
 Each actor spec is **at most 100 lines**. Within that budget: **zero omissions, zero generalizations, zero ambiguity**. Brevity means cutting filler, **not** cutting required detail.
 
-- Every workflow step that **sends a message** names the **recipient explicitly** (see **Replies**).
-- Every **subagent spawn** states what the child **does**, which **reply messages** the parent may get back, and what the parent **does on each reply** (including explicit **reply to \`replyTo\`** or **tell [...]** when the parent sends onward).
+- Every workflow step that **sends a message** names the **recipient explicitly** (see **Outbound messages**).
+- Every **subagent spawn** states what the child **does**, which **reply messages** the parent may get back, and what the parent **does on each reply** (including explicit **reply to \`replyTo\`** when the parent sends onward).
 - Every **conditional** (success vs failure, branch A vs B) is written out; do not leave one path implicit.
 - If a reader could ask “who receives this?” or “what happens next?”, the spec is incomplete.
 
@@ -174,21 +174,19 @@ The following patterns appear frequently in well-written workflows. Read [exampl
 
 **Conditional branching.** When a step has different outcomes, spell out each branch explicitly.
 
-**Replies and tells — recipients must be explicit.** Do **not** use **“emit”**, **“send”**, or bare **“reply with \`Message(...)\`”** without naming who receives the message. Every outbound message in the workflow uses **exactly one** of:
+**Outbound messages.** Every outbound message in the workflow uses **exactly one** of these two patterns:
 
-1. **`reply to \`replyTo\` with \`Message(...)\`**` — use the **`replyTo`** (or equivalent) **field name** from the **incoming request** in **`messages.md`** (if the catalog uses `sender`, `clientRef`, etc., use that exact name in the prose).
-2. **`tell [Actor Name](path/to/spec.md) with \`Message(...)\`**` — markdown link to the receiving actor’s spec; use when the recipient is not the original requester.
+1. **`reply to \`replyTo\` with \`Message(...)\`** — use the **`replyTo`** (or equivalent) **field name** from the **incoming request** in **`messages.md`** (if the catalog uses `sender`, `clientRef`, etc., use that exact name in the prose).
+2. **`Spawn the Subagent [Name](path/to/actor-spec.md)`** — create a child actor; link to its spec with a markdown path. State what the child does, which reply messages the parent receives (names from **`messages.md`**), and nested substeps for each reply branch (see **Subagent delegation** below).
 
-**Forbidden in workflow text:** “Emit \`Foo\`”, “Send \`Foo\`”, “Reply with \`Foo\`” with no recipient named in the same step.
+Do **not** use **“emit”**, **“send”**, or bare **“reply with \`Message(...)\`”** outside these two patterns.
 
-**Good / bad**
+Examples:
 
-- BAD: Emit \`BatchItemFailed\` for that image.
-- BAD: Reply with \`BatchItemFailed(jobId, image, lastError)\` and end. *(Who receives it?)*
-- GOOD: Reply to \`replyTo\` with \`BatchItemFailed(jobId, image, lastError)\` and continue with remaining images.
-- GOOD: Tell [Port Plugin Client](specs/port-plugin-client.md) with \`Blocked(reasons)\` and end.
+- Reply to \`replyTo\` with \`BatchItemFailed(jobId, image, lastError)\` and continue with remaining images.
+- Spawn the Subagent [Resize Worker](resize-worker.md); spell out capability, reply message names, and nested branches per **Subagent delegation** below.
 
-Conciseness is **not** an excuse to omit the recipient: *“Reply to \`replyTo\` with \`Blocked(reasons)\` and end”* is short and unambiguous.
+Conciseness is **not** an excuse to skip the pattern: *“Reply to \`replyTo\` with \`Blocked(reasons)\` and end”* is short and unambiguous.
 
 **Child replies:** When a **child** answers with a message listed under your **`## Receives`** (e.g. \`GatekeeperOutcome\`), branch in the workflow on that type. Any **final outcome to the original client** still uses **reply to \`replyTo\` with \`...\`** when the request carried \`replyTo\`.
 
@@ -202,7 +200,7 @@ Conciseness is **not** an excuse to omit the recipient: *“Reply to \`replyTo\`
 
 1. **What the child does** — one clause (capability in plain language), **not** a recap of which message types appear in the child’s **`## Receives`**.
 2. **Which reply messages** the parent may receive from that child (names matching **`messages.md`**).
-3. **Nested substeps** — one per distinct reply: exact next action, including **reply to \`replyTo\`** or **tell [...]** whenever the parent sends a message onward.
+3. **Nested substeps** — one per distinct reply: exact next action, including **reply to \`replyTo\`** whenever the parent sends a message onward.
 
 **Bad:** *Spawn the Subagent [Resize Worker](resize-worker.md), which performs \`ResizeRequest\` / \`ResizeDone\` handling.* (Mailbox trivia; omits what the parent expects and does.)
 
@@ -214,7 +212,7 @@ Template:
 
 ```markdown
 1. Spawn the Subagent [Subagent Name](path/to/subagent/specification.md). It will <capability> and reply with `MessageA` / `MessageB` / … (names and shapes from the suite message catalog in Suite references).
-    1. On `MessageA`, <next step; if sending, use reply to `replyTo` or tell [Peer](peer.md)>.
+    1. On `MessageA`, <next step; if sending onward, use reply to `replyTo` or another **Spawn the Subagent** step as needed>.
     2. On `MessageB`, <next step>.
 ```
 
