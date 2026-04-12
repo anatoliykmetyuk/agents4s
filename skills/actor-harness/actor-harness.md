@@ -4,7 +4,7 @@ Follow the steps to do it:
 
 1. Scaffold the Scala project following the [Project Boilerplate](references/project-boilerplate.md) instructions.
 2. Read the `INDEX.md` file to discover the list of [Specification Files](actor-spec.md).
-3. For each specification file discovered in the previous step, create the Scala source files to translate the entities discovered in the specification file into Scala code. Use _Definitions File_ to disambiguate the meaning of terms used through out the spec. Follow the _Actor Translation Guide_ below.
+3. For each specification file discovered in the previous step, create the Scala source files to translate the entities discovered in the specification file into Scala code. Use _Definitions File_ and _Reference Files_ to disambiguate the meaning of terms and for extra context. Follow the _Actor Translation Guide_ below.
 
 ## Actor Translation Guide
 
