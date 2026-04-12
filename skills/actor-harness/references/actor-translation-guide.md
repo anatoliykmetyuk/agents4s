@@ -27,27 +27,33 @@ Each outgoing message becomes a **response or notification** type in the same ob
 
 ### Messages not in the spec (implementation)
 
-- **Private/internal** messages for async completion: e.g. `private final case class GatekeeperReply(...)`, `private case object WorkerTimedOut`.
+- **Private/internal** messages for this actor only: timers, `messageAdapter` results, **parent-only completion envelopes** (see below). Example: `private case object WorkerTimedOut`.
 - **LLM completion:** after `messageAdapter`, use a single wrapper or discriminate `O | LLMActor.LLMError` — include these cases in **`AcceptedMessages`**.
+
+### Where each actor’s protocol lives
+
+- **`### Receives`** and **`### Sends`** for actor **A** are **`final case class` / `sealed trait`** definitions in **`object A`** in **`A.scala`** (that actor’s file). **Never** define another actor’s public messages in a parent or sibling file.
+- **Child actors** are the same: **`object TheGatekeeper`**, **`AcceptedMessages`**, and all of that spec’s Receives/Sends types live in **`TheGatekeeper.scala`** (or its package). The **parent** does **not** host the child’s protocol.
+- When the parent must handle a child outcome, add **private** envelopes **in the parent** whose **fields reference** types from the child companion (e.g. `TheGatekeeper.SomeResponse`), or use **`messageAdapter`** to map into **one** such parent-private type per child. Those envelopes are **not** part of the child’s public spec — they are wiring.
 
 ## `AcceptedMessages` union
 
 ```scala
 type AcceptedMessages =
   PortPluginRequest |
-  GatekeeperDone |
-  WorkerDone |
-  ValidatorDone |
+  GatekeeperPhaseCompleted | // parent-private; payload uses TheGatekeeper.* types
+  WorkerPhaseCompleted |
+  ValidatorPhaseCompleted |
   LlmStepFailed
 ```
 
 **Include:**
 
-1. Every **`### Receives`** type for this actor.
-2. Every **internal** message type the actor’s `Behavior` must handle (child completions, timers, LLM adapter results).
-3. Do **not** list another actor’s types unless they are literally sent to this ref — usually you wrap child replies in **your** case classes.
+1. Every **`### Receives`** type for **this** actor (defined in **this** file).
+2. Every **internal** message type **this** actor’s `Behavior` must handle (timers, LLM adapter results, **parent-private** child-completion envelopes).
+3. Do **not** copy another actor’s **`### Receives` / `### Sends`** types into this file. **Do not** add another actor’s public types bare into this union — wrap completions in **your** private case classes that **reference** the child’s types (e.g. `TheGatekeeper.Outcome`) where needed.
 
-**Naming:** Prefer **one wrapper per child** (e.g. `GatekeeperDone(result: ...)`) instead of stuffing another actor’s entire `Sends` union into yours unless the protocol is literally typed that way.
+**Naming:** Prefer **one private wrapper per spawned child** (e.g. `GatekeeperPhaseCompleted(outcome: TheGatekeeper.Outcome)`) whose payload uses types declared under **`TheGatekeeper`**, not ad hoc duplicates of the child protocol in the parent.
 
 ## Workflow → `def` behaviors
 
@@ -61,13 +67,13 @@ Example comment style:
 // Workflow §4: Gatekeeper
 def awaitingGatekeeper(...): Behavior[AcceptedMessages] =
   Behaviors.receiveMessage:
-    case GatekeeperDone(result) => ...
+    case GatekeeperPhaseCompleted(outcome) => ... // outcome: TheGatekeeper.*
 ```
 
 ## `(Agentic Step)` and subagents
 
-- **`Spawn the Subagent [The Gatekeeper](01-1-actor-the-gatekeeper.md)`** → `context.spawn(TheGatekeeper(deps), "gatekeeper-...")`, message child with **`TheGatekeeper.SomeReceive`**; map child **`Sends`** into **`GatekeeperDone`** (or similar) for the parent union.
-- Subagent specs are separate files — implement **`object TheGatekeeper`** there with **its own** `AcceptedMessages`.
+- **`Spawn the Subagent [The Gatekeeper](01-1-actor-the-gatekeeper.md)`** → `context.spawn(TheGatekeeper(deps), "gatekeeper-...")`, message child with **`TheGatekeeper.SomeReceive`** (types defined **only** under **`object TheGatekeeper`** in the gatekeeper file). Adapt outcomes into a **parent-private** wrapper (e.g. **`GatekeeperPhaseCompleted`**) that appears in the **parent’s** `AcceptedMessages` and carries **`TheGatekeeper.*`** send types as fields — do **not** add the child’s Receives/Sends ADTs to the parent object.
+- Subagent specs are separate files — implement **`object TheGatekeeper`** there with **its own** `AcceptedMessages` derived from **that** spec only.
 - If the step is **`(Agentic Step)`** **without** a child actor (pure LLM on this actor’s workspace), use **`LLMActor.start[O]`** per [library-api.md](library-api.md).
 
 ## Bounded loops
@@ -95,7 +101,7 @@ Actors with **short** workflows stay as **one file** under `<pkg>/GetItPassing.s
 
 **Spec (abbreviated):** “Get It Passing” receives `PortPluginRequest`, sends `AlreadyPorted`, `Blocked`, `PortingComplete`, `PortingFailed`; workflow spawns Gatekeeper, Worker, Validator with retries.
 
-**Sketch** (not full — shows unions + defs):
+**Sketch** (not full — shows unions + defs). **`TheGatekeeper.GatekeeperResponse`** and the rest of the gatekeeper’s Receives/Sends live in **`TheGatekeeper.scala`** — the parent only **references** that type as a field type here.
 
 ```scala
 // Spec: specs/01-0-actor-get-it-passing.md
@@ -123,10 +129,12 @@ object GetItPassing:
   final case class PortingComplete(reports: List[java.nio.file.Path]) extends PortPluginResponse
   final case class PortingFailed(reports: List[java.nio.file.Path]) extends PortPluginResponse
 
-  private final case class GatekeeperDone(/* map from child Sends */)
-  // ... internal messages for Worker/Validator completions, LLM, etc.
+  // Child protocols live in TheGatekeeper.scala / TheWorker.scala / … — not here.
+  // Parent-only envelopes (private): reference child companions for payloads.
+  private final case class GatekeeperPhaseCompleted(outcome: TheGatekeeper.GatekeeperResponse)
+  // ... e.g. WorkerPhaseCompleted(...), ValidatorPhaseCompleted(...), LLM adapter wrappers
 
-  type AcceptedMessages = PortPluginRequest | GatekeeperDone /* | ... */
+  type AcceptedMessages = PortPluginRequest | GatekeeperPhaseCompleted /* | ... */
 
   final class Deps(/* clones root, branch names, spawn Gatekeeper, ... */)
 
@@ -147,7 +155,7 @@ object GetItPassing:
       attemptsLeft: Int
   ): Behavior[AcceptedMessages] =
     Behaviors.receiveMessage:
-      case GatekeeperDone(outcome) => /* branch per spec §4 */
+      case GatekeeperPhaseCompleted(outcome) => /* branch per spec §4; outcome from TheGatekeeper */
         Behaviors.same
 
 end GetItPassing

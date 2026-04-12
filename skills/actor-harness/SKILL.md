@@ -73,13 +73,13 @@ For **each** actor spec:
 - **Messages:** Implement the **Messaging Protocol** inside the object:
   - **`### Receives`** → incoming case classes (and sealed families when the spec describes variants). Requests that need replies: add **`replyTo: ActorRef[Response]`** using the Sends types for that interaction.
   - **`### Sends`** → reply/notification types the actor emits to **non-child** peers (per actor-spec rules).
-  - **Child-only traffic:** the actor-spec omits messages used only with children; when you implement spawns, add **internal** message types for child completions (e.g. **`private final case class GatekeeperFinished(...)`**) and include them in **`AcceptedMessages`** (see below).
+  - **Child-only traffic:** the actor-spec omits messages used only with children. **Do not** define a child’s **`### Receives` / `### Sends`** in the parent file — those belong in the **child actor’s** object (see [references/actor-translation-guide.md](references/actor-translation-guide.md)). When the parent must react to a child outcome, add **parent-private** completion types (e.g. **`private final case class GatekeeperFinished(payload: TheGatekeeper.SomeResponse)`**) and include them in **`AcceptedMessages`**.
 - **`AcceptedMessages`:** A **Scala 3 union type** alias, e.g.  
   `type AcceptedMessages = PortPluginRequest | GatekeeperFinished | WorkerFinished | ...`  
   Include:
-  - Every message from **`### Receives`**.
-  - Every **internal** completion message you introduce for children (including **`LLMActor`** completions adapted into the parent).
-  - Optionally, if a child’s **public Sends** types are delivered **to this parent** as messages, include those types in the union (align with how you wrap them — often as a single wrapping case class per child).
+  - Every message from **`### Receives`** (for **this** actor only).
+  - Every **internal** completion message **this** actor handles (parent-private envelopes for child outcomes, **`LLMActor`** completions, timers — **payloads** may reference types from child companions such as **`TheGatekeeper.*`**).
+  - **Do not** paste another actor’s public ADTs into **`object`** parent — wrap child results in **your** private case classes or **`messageAdapter`** targets (often one wrapper per spawned child).
 - **Behaviors:** Implement **`def apply(deps): Behavior[AcceptedMessages]`** as the entry. Split the **Workflow** into **`def`**s returning **`Behavior[AcceptedMessages]`** — one def per phase/state so each block stays **short and mappable** to numbered workflow steps (e.g. `def awaitingGatekeeper(pluginId: String): Behavior[AcceptedMessages]`).
 
 Mechanical translation rules, ADTs, and reply patterns: [references/actor-translation-guide.md](references/actor-translation-guide.md).
