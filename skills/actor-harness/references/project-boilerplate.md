@@ -1,6 +1,6 @@
 # Project boilerplate (Scala 3 / sbt / Pekko Typed)
 
-Use these templates when scaffolding a harness (**Step 2** of `SKILL.md`). Scripts live under **`scripts/`** and change directory to the **project root** (parent of `scripts/`) before running sbt.
+Use these templates when scaffolding a harness (**Step 1** of [actor-harness.md](../actor-harness.md)). Scripts live under **`scripts/`** and change directory to the **project root** (parent of `scripts/`) before running sbt.
 
 ## `scripts/setup.sh`
 
@@ -36,9 +36,7 @@ exec sbt test "$@"
 
 ## `build.sbt` (snippet)
 
-**agents4s-pekko** and **agents4s-testkit** are **local SNAPSHOT** artifacts (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in this repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes.
-
-Use **`me.anatoliikmt` %% `agents4s-pekko`** for **`LLMActor`** and uPickle JSON output types; it depends on **`agents4s-core`**, **Pekko Typed**, **uPickle**, and **upickle-jsonschema** transitively. Add **`agents4s-testkit`** ( **`StubAgent`** and future test helpers; depends on core only), **Pekko testkit**, and **ScalaTest** for tests.
+See [library-api.md](library-api.md) for transitive dependency details. **agents4s-pekko** and **agents4s-testkit** are **local SNAPSHOT** artifacts (`0.1.0-SNAPSHOT`), resolved from `~/.ivy2/local` after `sbt publishLocal` in this repository (or `./scripts/install-skill.sh` there). Re-publish when the library changes.
 
 ```scala
 val scala3Version = "3.8.3"
@@ -58,8 +56,6 @@ lazy val harness = project
     Test / fork := true,
   )
 ```
-
-No extra JSON library is required for **`LLMActor`** result parsing — uPickle is already on the classpath.
 
 ## `src/main/resources/application.conf`
 
@@ -93,7 +89,7 @@ out/
 
 ## Directory layout (reference)
 
-Actor-spec harnesses use **`specs/messages.md`** as the **canonical** definition of all inter-actor messages; **`messages.scala`** is generated from it. Each actor spec lists **message names only** under **`## Receives`**; **one Scala file per actor object**. If an actor needs **helper modules**, add a **subpackage** named after that actor (lower case) containing **`ActorName.scala`** + **`helpers.scala`** (see **Step 4** in `SKILL.md`).
+Reference layout for a generated harness (see [actor-harness.md](../actor-harness.md) for translation rules):
 
 ```
 my-harness/
@@ -105,7 +101,7 @@ my-harness/
 │   ├── Main.scala
 │   └── actor1/                # per-actor package
 │       ├── Actor1.scala
-|       ├── Actor1Main.scala   # standalone main object to test this Actor all by itself
+│       ├── Actor1Main.scala   # standalone main object to test this Actor all by itself
 │       └── helpers1.scala
 ├── src/main/resources/
 │   ├── application.conf
@@ -117,9 +113,7 @@ my-harness/
 
 ## Prompt template example (task prompt only)
 
-Store templates under **`src/main/resources/prompts/`** so they are on the **classpath** at **`prompts/<filename>`** (required for **`PromptTemplate.load`** / **`loadResource`**).
-
-The **task** prompt describes what the model should do in the workspace. **`LLMActor`** adds a separate **result** prompt with JSON path and schema; describe output **fields** in code via **`outputInstructions`**, not necessarily in this file.
+Load with **`PromptTemplate.load(...)`** and pass the string as **`inputPrompt`** to **`LLMActor.start`** (see [library-api.md](library-api.md) for classpath paths, **`outputInstructions`**, and integration).
 
 ```markdown
 You are inspecting **one** work item. Follow the actor specification procedure.
@@ -138,7 +132,5 @@ You are inspecting **one** work item. Follow the actor specification procedure.
 
 When finished, wait for the next instruction (structured JSON step).
 ```
-
-Load with **`PromptTemplate.load("inspect.md", Map("ITEM_ID" -> ..., "WORKSPACE" -> ...))`** and pass the string as **`inputPrompt`** to **`LLMActor.start`**. Use **`outputInstructions`** such as: *`status` is one of OK, NEEDS_WORK, BLOCKED; `reason` is optional text.*
 
 Default **Cursor** model for live runs is **`composer-2-fast`** unless the user overrides it (matches repo integration defaults).

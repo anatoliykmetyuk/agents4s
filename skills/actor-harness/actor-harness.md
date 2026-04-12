@@ -52,15 +52,7 @@ The behavior `def`s must closely follow the specification - aim for each line of
 
 As the agent will be changing its behavior over time, it is expected that the workflow specified in the _Actor Specification File_ will be split over several behavior `def`s. For the reference on how to define behaviors, see the [Behaviors API](https://pekko.apache.org/api/pekko/current/org/apache/pekko/actor/typed/scaladsl/Behaviors$.html).
 
-**`(Agentic Step)`** steps are expressed via `agents4s.pekko.LLMActor` backed by `agents4s.cursor.CursorAgent` - see [library-api.md](references/library-api.md) for more details. For such steps, you are supposed to start a new `LLMActor`, supply it with a prompt and expect a response message with the results of its work. Store the prompt in the project resources directory under `src/main/resources/prompts/` and load it using `agents4s.prompt.PromptTemplate.load`. Note that such a response message must have the `JsonSchema` and `ReadWriter` typeclasses derived for it. Follow the example pattern below to do so:
-
-```scala
-import upickle.default.*
-import upickle.jsonschema.*
-
-case class MyStepResult(answer: String, confidence: Option[Double]) derives ReadWriter
-given JsonSchema[MyStepResult] = JsonSchema.derived
-```
+**`(Agentic Step)`** steps are expressed via `agents4s.pekko.LLMActor` backed by `agents4s.cursor.CursorAgent` — see [library-api.md](references/library-api.md) for wiring, prompts, and the **`JsonSchema`/`ReadWriter` pattern** for structured replies. For such steps, start a new `LLMActor`, supply a prompt, and expect a reply with the step results. Store prompts under `src/main/resources/prompts/` and load with `agents4s.prompt.PromptTemplate.load`.
 
 **Spawn a child actor** steps are expressed via `context.spawn` spawning the child actor and expecting it to reply with a message.
 
