@@ -4,7 +4,7 @@ Follow the steps to do it:
 
 1. Scaffold the Scala project following the [Project Boilerplate](references/project-boilerplate.md) instructions.
 2. Discover actor specs, message definitions, and term definitions. Read the `specs/` folder recursively, locating the _Messages File_, the _Definitions File_ and the _Actor Specification_ files by looking at their first line headers and matching them to the [Actor Specification](actor-spec.md) format.
-3. For each actor specification file, create the Scala source files to translate the entities discovered in the previous step into Scala code - follow the _Actor Translation Guide_ below.
+3. For each actor specification file, create the Scala source files to translate the entities discovered in the previous step into Scala code. Use _Definitions File_ to disambiguate the meaning of terms used through out the spec. Follow the _Actor Translation Guide_ below.
 
 ## Actor Translation Guide
 
@@ -48,13 +48,17 @@ Each `object <ActorName>` (in `<ActorName>.scala`) holds:
 - `def apply(inputParameters...): Behavior[AcceptedMessages]` - the starting behavior of the actor accepting any inputs it may need to start its work.
 - Other behavior `def`s as needed, returning `Behavior[AcceptedMessages]`.
 
-The behavior `def`s must closely follow the specification - aim for each line of such `def` to be a single step as defined in the specification. Abstract such steps into separate functions defined in the object and named after the specification steps to achieve declarative style. Aim for the total size of such a `def` to be on the order of the number of steps it implements.
+**Behaviors**. The behavior `def`s must closely follow the specification - aim for each line of such `def` to be a single step as defined in the specification. Abstract such steps into separate functions defined in the object and named after the specification steps to achieve declarative style. Aim for the total size of such a `def` to be on the order of the number of steps it implements.
 
-As the agent will be changing its behavior over time, it is expected that the workflow specified in the _Actor Specification File_ will be split over several behavior `def`s. For the reference on how to define behaviors, see the [Behaviors API](https://pekko.apache.org/api/pekko/current/org/apache/pekko/actor/typed/scaladsl/Behaviors$.html).
+As the agent will be changing its behavior over time, it is expected that the workflow specified in the _Actor Specification File_ will be split over several behavior `def`s.
+
+The behaviors are defined using `Behaviors.receive`, `Behaviors.receiveMessage`, `Behaviors.setup`, `Behaviors.receivePartial`, `Behaviors.withTimers` and other `Behaviors` methods. For the reference on how to define behaviors, see the [Behaviors API](https://pekko.apache.org/api/pekko/current/org/apache/pekko/actor/typed/scaladsl/Behaviors$.html).
 
 **`(Agentic Step)`** steps are expressed via `agents4s.pekko.LLMActor` backed by `agents4s.cursor.CursorAgent` — see [library-api.md](references/library-api.md) for wiring, prompts, and the **`JsonSchema`/`ReadWriter` pattern** for structured replies. For such steps, start a new `LLMActor`, supply a prompt, and expect a reply with the step results. Store prompts under `src/main/resources/prompts/` and load with `agents4s.prompt.PromptTemplate.load`.
 
 **Spawn a child actor** steps are expressed via `context.spawn` spawning the child actor and expecting it to reply with a message.
+
+**Inter-agent Communication** should be done by sending messages between actors using the `recipient ! message` pattern. Afterwards, if the sender is expecting a reply, it must change its behavior to be able to handle such a reply by returning a `Behavior[AcceptedMessages]` from the current behavior `def`.
 
 ### Helper File
 
