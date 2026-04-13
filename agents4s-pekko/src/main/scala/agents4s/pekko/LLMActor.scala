@@ -56,7 +56,9 @@ Output in the precise format specified above.
       timers.startTimerWithFixedDelay(HeartbeatTimerKey, HeartbeatTick, 1.second)
       withAgentCleanup(agent, awaitDone[O](replyTo, agent, outputInstructions))
 
-  /** Calls [[Agent.stop]] on [[PostStop]] for any termination path (success, failure, or external stop). */
+  /** Calls [[Agent.stop]] on [[PostStop]] for any termination path (success, failure, or external
+    * stop).
+    */
   private def withAgentCleanup[T: ClassTag](agent: Agent, behavior: Behavior[T]): Behavior[T] =
     Behaviors.intercept(() =>
       new BehaviorInterceptor[T, T]:
