@@ -32,17 +32,16 @@ Write the result of your operation to JSON file at the following path: {{JSON_FI
 Use the following schema to record your result: {{JSON_SCHEMA}}
 
 Output in the precise format specified above.
-
-Do not do anything else - immediately output the result based on your earlier work.
 """
 
   def start[O: JsonSchema: ReadWriter](
       replyTo: ActorRef[O | LLMError],
-      agent: Agent,
+      agentConstructor: () => Agent,
       inputPrompt: String,
       outputInstructions: String
   ): Behavior[HeartbeatTick.type] =
     Behaviors.withTimers: timers =>
+      val agent = agentConstructor()
       agent.start()
       agent.awaitIdle(100.seconds, pollInterval = 100.millis)
       agent.sendPrompt(inputPrompt, promptAsFile = true)
