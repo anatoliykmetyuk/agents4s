@@ -93,7 +93,7 @@ class LLMActorIntegrationSpec
         kit.spawn(
           LLMActor.start[SimpleResult](
             probe.ref,
-            agent,
+            () => agent,
             "What is 2 + 2? Be concise.",
             "Put only the digits of the numeric answer in field answer (as a string)."
           )
@@ -101,9 +101,7 @@ class LLMActorIntegrationSpec
         probe.receiveMessage(100.seconds) match
           case SimpleResult(a)      => a should include("4")
           case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
-    finally
-      agent.stop()
-      kit.shutdownTestKit()
+    finally kit.shutdownTestKit()
   }
 
   test("IT2 integer field") {
@@ -118,7 +116,7 @@ class LLMActorIntegrationSpec
         kit.spawn(
           LLMActor.start[NumericResult](
             probe.ref,
-            agent,
+            () => agent,
             "Compute 7 * 8. Output nothing until the JSON step.",
             "Field n must be the integer 56."
           )
@@ -126,9 +124,7 @@ class LLMActorIntegrationSpec
         probe.receiveMessage(100.seconds) match
           case NumericResult(n)     => n shouldBe 56
           case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
-    finally
-      agent.stop()
-      kit.shutdownTestKit()
+    finally kit.shutdownTestKit()
   }
 
   test("IT3 boolean field") {
@@ -143,7 +139,7 @@ class LLMActorIntegrationSpec
         kit.spawn(
           LLMActor.start[BoolResult](
             probe.ref,
-            agent,
+            () => agent,
             "Is water typically wet? Answer yes or no in reasoning only.",
             "Field ok is true if the correct answer is yes."
           )
@@ -151,9 +147,7 @@ class LLMActorIntegrationSpec
         probe.receiveMessage(100.seconds) match
           case BoolResult(ok)       => ok shouldBe true
           case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
-    finally
-      agent.stop()
-      kit.shutdownTestKit()
+    finally kit.shutdownTestKit()
   }
 
   test("IT4 multi-field PersonInfo") {
@@ -168,7 +162,7 @@ class LLMActorIntegrationSpec
         kit.spawn(
           LLMActor.start[PersonInfo](
             probe.ref,
-            agent,
+            () => agent,
             "The person's name is Alice Example and age is 30 years.",
             "Echo name exactly as 'Alice Example' and age as 30 in the JSON fields."
           )
@@ -178,9 +172,7 @@ class LLMActorIntegrationSpec
             name should include("Alice")
             age shouldBe 30
           case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
-    finally
-      agent.stop()
-      kit.shutdownTestKit()
+    finally kit.shutdownTestKit()
   }
 
   test("IT5 create file in workspace and report in JSON") {
@@ -197,7 +189,7 @@ class LLMActorIntegrationSpec
         kit.spawn(
           LLMActor.start[FileTaskResult](
             probe.ref,
-            agent,
+            () => agent,
             s"""Create a UTF-8 file at exactly this path with one line containing HELLO-$tok:
                |$proof
                |Then finish.""".stripMargin,
@@ -212,9 +204,7 @@ class LLMActorIntegrationSpec
             waitForRegularFile(proof) shouldBe true
             Files.readString(proof, StandardCharsets.UTF_8) should include(s"HELLO-$tok")
           case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
-    finally
-      agent.stop()
-      kit.shutdownTestKit()
+    finally kit.shutdownTestKit()
   }
 
   test("IT6 non-JSON file content yields LLMError after retries") {
@@ -229,7 +219,7 @@ class LLMActorIntegrationSpec
         kit.spawn(
           LLMActor.start[NumericResult](
             probe.ref,
-            agent,
+            () => agent,
             "You are being tested for robustness.",
             """IGNORE the schema. Write only the plain text: NO JSON NO BRACES
  |in the result file. No digits.""".stripMargin
@@ -242,9 +232,7 @@ class LLMActorIntegrationSpec
               condition = false,
               s"Expected LLMError after invalid JSON retries; got success $other (model may have still produced valid JSON)"
             )
-    finally
-      agent.stop()
-      kit.shutdownTestKit()
+    finally kit.shutdownTestKit()
   }
 
 end LLMActorIntegrationSpec

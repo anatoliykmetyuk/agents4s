@@ -4,8 +4,16 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
 import scala.concurrent.duration.*
+import scala.reflect.ClassTag
 
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{
+  ActorRef,
+  Behavior,
+  BehaviorInterceptor,
+  PostStop,
+  Signal,
+  TypedActorContext
+}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 import upickle.jsonschema.JsonSchema
@@ -46,7 +54,29 @@ Output in the precise format specified above.
       agent.awaitIdle(100.seconds, pollInterval = 100.millis)
       agent.sendPrompt(inputPrompt, promptAsFile = true)
       timers.startTimerWithFixedDelay(HeartbeatTimerKey, HeartbeatTick, 1.second)
-      awaitDone[O](replyTo, agent, outputInstructions)
+      withAgentCleanup(agent, awaitDone[O](replyTo, agent, outputInstructions))
+
+  /** Calls [[Agent.stop]] on [[PostStop]] for any termination path (success, failure, or external stop). */
+  private def withAgentCleanup[T: ClassTag](agent: Agent, behavior: Behavior[T]): Behavior[T] =
+    Behaviors.intercept(() =>
+      new BehaviorInterceptor[T, T]:
+        override def aroundReceive(
+            ctx: TypedActorContext[T],
+            msg: T,
+            target: BehaviorInterceptor.ReceiveTarget[T]
+        ): Behavior[T] = target(ctx, msg)
+
+        override def aroundSignal(
+            ctx: TypedActorContext[T],
+            signal: Signal,
+            target: BehaviorInterceptor.SignalTarget[T]
+        ): Behavior[T] =
+          signal match
+            case PostStop =>
+              agent.stop()
+              target(ctx, signal)
+            case _ => target(ctx, signal)
+    )(behavior)
 
   private def promptToWriteResult[O: JsonSchema: ReadWriter](
       agent: Agent,

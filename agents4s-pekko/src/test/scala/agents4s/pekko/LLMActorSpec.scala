@@ -72,13 +72,14 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
-          stub,
+          () => stub,
           "do work",
           "Put greeting in value"
         )
       )
       probe.expectMessage(30.seconds, TestResult("hello"))
       probe.expectTerminated(child, 5.seconds)
+      stub.isStarted shouldBe false
     }
   }
 
@@ -96,13 +97,14 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
-          stub,
+          () => stub,
           "task",
           "instructions"
         )
       )
       probe.expectMessage(30.seconds, TestResult("delayed"))
       probe.expectTerminated(child, 5.seconds)
+      stub.isStarted shouldBe false
     }
   }
 
@@ -120,13 +122,14 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
       val child = testKit.spawn(
         LLMActor.start[NestedResult](
           probe.ref,
-          stub,
+          () => stub,
           "nested",
           "nested out"
         )
       )
       probe.expectMessage(30.seconds, NestedResult(TestResult("in"), 42))
       probe.expectTerminated(child, 5.seconds)
+      stub.isStarted shouldBe false
     }
   }
 
@@ -147,7 +150,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
-          stub,
+          () => stub,
           "x",
           "y"
         )
@@ -155,6 +158,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
       probe.expectMessage(45.seconds, TestResult("fixed"))
       stub.recordedSendPrompts should have size 3
       probe.expectTerminated(child, 5.seconds)
+      stub.isStarted shouldBe false
     }
   }
 
@@ -172,7 +176,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
-          stub,
+          () => stub,
           "x",
           "y"
         )
@@ -182,6 +186,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
         case other                => fail(s"expected LLMError, got $other")
       stub.recordedSendPrompts should have size 4
       probe.expectTerminated(child, 5.seconds)
+      stub.isStarted shouldBe false
     }
   }
 
@@ -202,13 +207,14 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
-          stub,
+          () => stub,
           "x",
           "y"
         )
       )
       probe.expectMessage(45.seconds, TestResult("ok"))
       probe.expectTerminated(child, 5.seconds)
+      stub.isStarted shouldBe false
     }
   }
 
@@ -231,7 +237,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
-          stub,
+          () => stub,
           "INPUT_BODY_UNIQUE",
           outInstr
         )
@@ -244,6 +250,35 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
       p should include("following schema")
       p should include(outInstr)
       probe.expectTerminated(child, 5.seconds)
+      stub.isStarted shouldBe false
+    }
+  }
+
+  test("agent is stopped when LLMActor is stopped before completion") {
+    withTestKit { testKit =>
+      val ws = tmpWorkspace
+      val stub = new StubAgent(
+        ws,
+        busyPhases = List(0, 500),
+        onSendPrompt = _ => ()
+      )
+      val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
+      val child = testKit.spawn(
+        LLMActor.start[TestResult](
+          probe.ref,
+          () => stub,
+          "task",
+          "out"
+        )
+      )
+      var spins = 0
+      while stub.recordedSendPrompts.size < 1 && spins < 200 do
+        Thread.sleep(10L)
+        spins += 1
+      stub.recordedSendPrompts should have size 1
+      testKit.stop(child)
+      probe.expectTerminated(child, 5.seconds)
+      stub.isStarted shouldBe false
     }
   }
 
@@ -265,7 +300,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
       val child = testKit.spawn(
         LLMActor.start[LargePayload](
           probe.ref,
-          stub,
+          () => stub,
           "big",
           "big out"
         )
@@ -275,6 +310,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
         LargePayload("A", 1, true, "D", 2)
       )
       probe.expectTerminated(child, 5.seconds)
+      stub.isStarted shouldBe false
     }
   }
 

@@ -49,7 +49,7 @@ Failures after the library exhausts its own retries are delivered on **`replyTo`
 ```scala
 def start[O: JsonSchema: ReadWriter](
     replyTo: ActorRef[O | LLMError],
-    agent: Agent,
+    agentConstructor: () => Agent,
     inputPrompt: String,
     outputInstructions: String
 )
@@ -57,9 +57,9 @@ def start[O: JsonSchema: ReadWriter](
 
 Returns a **`Behavior`** to **`spawn`**; you interact only through **`replyTo`** (**`O`** on success, **`LLMError`** on failure).
 
-**What it does (high level):** runs the **task** from **`inputPrompt`**, then asks the model for **structured JSON** matching **`O`** (schema + instructions come from **`outputInstructions`** and the library). Parses the result and **`tell`**s **`replyTo`**, then stops.
+**What it does (high level):** constructs an **`Agent`** via **`agentConstructor`**, runs the **task** from **`inputPrompt`**, then asks the model for **structured JSON** matching **`O`** (schema + instructions come from **`outputInstructions`** and the library). Parses the result and **`tell`**s **`replyTo`**, then stops.
 
-**Important:** `LLMActor` **does not** call **`agent.stop()`**. The **parent** owns the **`Agent`** and should **`stop()`** when the run is finished (e.g. when the child stops — **`context.watchWith`**).
+**Lifecycle:** `LLMActor` **owns** the constructed agent and calls **`agent.stop()`** on **`PostStop`** (normal completion, failure, or **`context.stop`** on the child). The parent does **not** need to **`stop()`** the agent when the child terminates.
 
 **Do not** call **`agent.awaitIdle`** / **`sendPrompt`** / **`start`** from the **parent**’s **`receiveMessage`** for LLM work — spawn this child instead. For **overall** deadlines or cancellation, use the **parent** (timers, `context.stop`, etc.).
 
@@ -106,7 +106,7 @@ final class StubAgent(
 - **`busyPhases`:** Controls how **`StubAgent`** simulates **`isBusy`** after each **`sendPrompt`** in tests (see testkit source for exact semantics).
 - **`onSendPrompt`:** Hook to simulate writes when the prompt contains the result-path cue (`"following path:"`).
 
-Use with **`LLMActor.start[O](probe.ref, stub, ...)`** in unit tests — no tmux, no real `agent` binary.
+Use with **`LLMActor.start[O](probe.ref, () => stub, ...)`** in unit tests — no tmux, no real `agent` binary.
 
 ---
 
@@ -117,17 +117,21 @@ import agents4s.cursor.CursorAgent
 import agents4s.pekko.LLMActor
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
-val agent = new CursorAgent(workspace, model, socket = s"run-$runId", label = "worker")
 val adapter = context.messageAdapter[InspectionResult | LLMActor.LLMError] {
   case r: InspectionResult => LlmFinished(r)
   case LLMActor.LLMError(e) => LlmFailed(e)
 }
 val taskPrompt = PromptTemplate.load("gatekeeper.md", Map("ITEM_ID" -> itemId))
 val child = context.spawn(
-  LLMActor.start[InspectionResult](adapter, agent, taskPrompt, "status is OK | NEEDS_WORK | BLOCKED; reason optional"),
+  LLMActor.start[InspectionResult](
+    adapter,
+    () => new CursorAgent(workspace, model, socket = s"run-$runId", label = "worker"),
+    taskPrompt,
+    "status is OK | NEEDS_WORK | BLOCKED; reason optional"
+  ),
   s"llm-gatekeeper-$itemId"
 )
-context.watchWith(child, GatekeeperChildStopped(agent))
+context.watch(child)
 ```
 
-Handle **`GatekeeperChildStopped`** with **`agent.stop()`**.
+Use **`context.watch(child)`** if the parent needs **`ChildTerminated`** / **`Terminated`** for bookkeeping; teardown of the Cursor session is handled inside **`LLMActor`**.
