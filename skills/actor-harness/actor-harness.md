@@ -56,6 +56,8 @@ The behaviors are defined using `Behaviors.receive`, `Behaviors.receiveMessage`,
 
 **`(Agentic Step)`** steps are expressed via `agents4s.pekko.LLMActor` backed by `agents4s.cursor.CursorAgent` — see [library-api.md](references/library-api.md) for wiring, prompts, and the **`JsonSchema`/`ReadWriter` pattern** for structured replies. For such steps, start a new `LLMActor`, supply a prompt, and expect a reply with the step results. Store prompts under `src/main/resources/prompts/` and load with `agents4s.prompt.PromptTemplate.load`.
 
+The prompts for every agentic step must be self-contained and must not rely on the specs folder being present in context. All the relevant context must be provided in the prompt. Specifically, make sure to provide the same information in the prompt as provided in the agentic step, the context information about the bigger workflow from the _Actor Specification File_, references to external resources etc. All project-specific definitions must be provided in the prompt.
+
 **Spawn a child actor** steps are expressed via `context.spawn` spawning the child actor and expecting it to reply with a message.
 
 **Inter-agent Communication** should be done by sending messages between actors using the `recipient ! message` pattern. Afterwards, if the sender is expecting a reply, it must change its behavior to be able to handle such a reply by returning a `Behavior[AcceptedMessages]` from the current behavior `def`.
