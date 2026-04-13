@@ -107,6 +107,8 @@ File Name | File Type
 - File Type is the type of the file, one of the following: Messages File, Definitions File, Actor Specification File.
 - Reference Files are files that contain arbitrary content relevent to the specification such as special knowledge, documentation etc.
 
+Apart from the table of the files listed above, the Index File may also contain arbitrary rules and conventions applicable to the specification files. These rules and conventions may override the rules specified in this specification.
+
 ## Rules for Writing Specifications
 
 - Each actor should do one specific job. Split complex jobs into multiple actors.
