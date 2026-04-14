@@ -80,6 +80,38 @@ class CursorAgentIntegrationTest
     finally agent.stop()
   }
 
+  test("second sendPrompt while busy after first returns") {
+    gate()
+    val tmp = tmpWorkspace
+    val (soc, label) = uniqueSessionIds
+    val log = tmp.resolve("busy_double_prompt_log.txt")
+    val agent = new CursorAgent(tmp, model, socket = soc, label = label)
+    val tokenA = UUID.randomUUID().toString.replace("-", "").take(8)
+    val tokenB = UUID.randomUUID().toString.replace("-", "").take(8)
+    try
+      withTimeout:
+        agent.start()
+        agent.awaitIdle(100.seconds)
+        agent.sendPrompt(
+          s"Append exactly one line to $log: BUSY_A $tokenA\\nThen continue working until asked to stop. Reply DONE after the line is appended.",
+          promptAsFile = true
+        )
+        agent.isBusy shouldBe true
+        agent.sendPrompt(
+          s"Append exactly one line to $log: BUSY_B $tokenB\\nThen stop. Reply DONE.",
+          promptAsFile = true
+        )
+        agent.awaitIdle(100.seconds)
+        agent.isIdle shouldBe true
+    finally agent.stop()
+
+    Files.isRegularFile(log) shouldBe true
+    val content = Files.readString(log, StandardCharsets.UTF_8)
+    content should include(tokenA)
+    content should include(tokenB)
+    content.indexOf(tokenA) should be < content.indexOf(tokenB)
+  }
+
   for (turns <- Seq(1, 2))
     test(s"multi turn ready busy done (turns=$turns)") {
       gate()

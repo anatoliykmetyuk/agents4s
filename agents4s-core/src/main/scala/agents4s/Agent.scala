@@ -32,7 +32,7 @@ trait Agent:
   /** Submits user prompt to the agent. This method is non-blocking and returns immediately.
     *
     * @throws RuntimeException
-    *   if the agent is busy or not started
+    *   if not started
     * @param prompt
     *   the prompt to send to the agent
     * @param promptAsFile

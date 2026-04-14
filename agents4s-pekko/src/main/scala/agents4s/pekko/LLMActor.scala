@@ -51,7 +51,7 @@ Output in the precise format specified above.
     Behaviors.withTimers: timers =>
       val agent = agentConstructor()
       agent.start()
-      agent.awaitIdle(100.seconds, pollInterval = 100.millis)
+      agent.awaitIdle(30.seconds, pollInterval = 100.millis)
       agent.sendPrompt(inputPrompt, promptAsFile = true)
       timers.startTimerWithFixedDelay(HeartbeatTimerKey, HeartbeatTick, 1.second)
       withAgentCleanup(agent, awaitDone[O](replyTo, agent, outputInstructions))
