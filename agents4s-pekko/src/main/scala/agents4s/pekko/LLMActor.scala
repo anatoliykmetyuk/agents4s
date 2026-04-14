@@ -57,7 +57,8 @@ Output in the precise format specified above.
         timers.startTimerWithFixedDelay(HeartbeatTimerKey, HeartbeatTick, 1.second)
         awaitDone[O](replyTo, agent, outputInstructions)
 
-  private class AgentCleanupInterceptor[T: ClassTag](agent: Agent) extends BehaviorInterceptor[T, T]:
+  private class AgentCleanupInterceptor[T: ClassTag](agent: Agent)
+      extends BehaviorInterceptor[T, T]:
     override def aroundReceive(
         ctx: TypedActorContext[T],
         msg: T,
@@ -122,8 +123,7 @@ Output in the precise format specified above.
           Behaviors.stopped
         catch
           case e: Exception =>
-            if attemptNo >= maxAttempts then
-              throw e
+            if attemptNo >= maxAttempts then throw e
             else
               val filepath = promptToWriteResult[O](agent, outputInstructions)
               awaitResultWritten[O](

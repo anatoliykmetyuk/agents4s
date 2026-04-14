@@ -181,11 +181,8 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
           "y"
         )
       )
-      probe.receiveMessage(45.seconds) match
-        case LLMActor.LLMError(e) => e shouldBe a[Exception]
-        case other                => fail(s"expected LLMError, got $other")
+      probe.expectTerminated(child, 45.seconds)
       stub.recordedSendPrompts should have size 4
-      probe.expectTerminated(child, 5.seconds)
       stub.isStarted shouldBe false
     }
   }

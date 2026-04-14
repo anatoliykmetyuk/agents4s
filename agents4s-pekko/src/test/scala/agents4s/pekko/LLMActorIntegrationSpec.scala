@@ -207,7 +207,7 @@ class LLMActorIntegrationSpec
     finally kit.shutdownTestKit()
   }
 
-  test("IT6 non-JSON file content yields LLMError after retries") {
+  test("IT6 non-JSON file content fails actor after retries") {
     gate()
     val tmp = tmpWorkspace
     val (soc, label) = uniqueSessionIds
@@ -216,7 +216,7 @@ class LLMActorIntegrationSpec
     try
       withTimeout:
         val probe = kit.createTestProbe[NumericResult | LLMActor.LLMError]()
-        kit.spawn(
+        val child = kit.spawn(
           LLMActor.start[NumericResult](
             probe.ref,
             () => agent,
@@ -225,13 +225,7 @@ class LLMActorIntegrationSpec
  |in the result file. No digits.""".stripMargin
           )
         )
-        probe.receiveMessage(100.seconds) match
-          case LLMActor.LLMError(_) => ()
-          case other =>
-            assume(
-              condition = false,
-              s"Expected LLMError after invalid JSON retries; got success $other (model may have still produced valid JSON)"
-            )
+        probe.expectTerminated(child, 100.seconds)
     finally kit.shutdownTestKit()
   }
 
