@@ -151,7 +151,7 @@ To implement Actor tests, follow the guidelines below:
 
 - Use `org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit` to write your Pekko ScalaTest specs, one spec per actor.
 - Mock the actor dependency APIs by extending their API traits and implementing the mock operations as needed to fully test the control flow of the actor.
-- Mock the child actors to be no-op actors returning `Behaviors.same` for all messages. Pekko Typed actors are sender-agnostic when they receive a new mesasge - they do not know who it comes from. Therefore, you do NOT need the mock child actors to send any messages to the tested actor - this is handled by the test kit.
+- Mock the child actors to be no-op actors returning `Behaviors.ignore` for all their behavior `def`s. Pekko Typed actors are sender-agnostic when they receive a new mesasge - they do not know who it comes from. Therefore, you do NOT need the mock child actors to send any messages to the tested actor - this is handled by the test kit.
 - Each test case is one path through the actor's control flow. To simulate the path, send an appropriate sequence of messages to the actor, simulating any external actor requests or actor's own child actor responses as needed.
 
 Here is an example of a test case for the actor:
@@ -160,12 +160,10 @@ Here is an example of a test case for the actor:
 class ReviewManagerSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with Matchers:
 
   private val noOpChild1: ChildActor1 = new ChildActor1:
-    def apply(m: String): Behavior[ChildActor1Inbox] =
-      Behaviors.receiveMessage(_ => Behaviors.same)
+    def apply(m: String) = Behaviors.ignore
 
   private val noOpChild2: ChildActor2 = new ChildActor2:
-    def apply(m: String): Behavior[ChildActor2Inbox] =
-      Behaviors.receiveMessage(_ => Behaviors.same)
+    def apply(m: String) = Behaviors.ignore
 
   private val mockApi1: Api1 = new Api1:
     def operation1(input: InputType): OutputTyped = throw new UnsupportedOperationException
