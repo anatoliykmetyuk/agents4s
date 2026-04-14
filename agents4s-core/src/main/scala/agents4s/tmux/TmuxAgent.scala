@@ -34,10 +34,6 @@ trait TmuxAgent extends Agent:
   override def sendPrompt(text: String, promptAsFile: Boolean): Unit =
     if !isStarted then
       throw new RuntimeException(s"${getClass.getSimpleName} is not started; call start() first")
-    if isBusy then
-      throw new RuntimeException(
-        s"${getClass.getSimpleName} is busy; wait for idle before sendPrompt"
-      )
 
     val textToSend =
       if promptAsFile then
