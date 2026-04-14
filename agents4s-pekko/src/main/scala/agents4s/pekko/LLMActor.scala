@@ -48,37 +48,33 @@ Output in the precise format specified above.
       inputPrompt: String,
       outputInstructions: String
   ): Behavior[HeartbeatTick.type] =
-    Behaviors.withTimers: timers =>
-      val agent = agentConstructor()
-      agent.start()
-      agent.awaitIdle(30.seconds, pollInterval = 100.millis)
-      agent.sendPrompt(inputPrompt, promptAsFile = true)
-      timers.startTimerWithFixedDelay(HeartbeatTimerKey, HeartbeatTick, 1.second)
-      withAgentCleanup(agent, awaitDone[O](replyTo, agent, outputInstructions))
+    val agent = agentConstructor()
+    Behaviors.intercept(() => AgentCleanupInterceptor[HeartbeatTick.type](agent)):
+      Behaviors.withTimers: timers =>
+        agent.start()
+        agent.awaitIdle(30.seconds, pollInterval = 100.millis)
+        agent.sendPrompt(inputPrompt, promptAsFile = true)
+        timers.startTimerWithFixedDelay(HeartbeatTimerKey, HeartbeatTick, 1.second)
+        awaitDone[O](replyTo, agent, outputInstructions)
 
-  /** Calls [[Agent.stop]] on [[PostStop]] for any termination path (success, failure, or external
-    * stop).
-    */
-  private def withAgentCleanup[T: ClassTag](agent: Agent, behavior: Behavior[T]): Behavior[T] =
-    Behaviors.intercept(() =>
-      new BehaviorInterceptor[T, T]:
-        override def aroundReceive(
-            ctx: TypedActorContext[T],
-            msg: T,
-            target: BehaviorInterceptor.ReceiveTarget[T]
-        ): Behavior[T] = target(ctx, msg)
+  private class AgentCleanupInterceptor[T: ClassTag](agent: Agent) extends BehaviorInterceptor[T, T]:
+    override def aroundReceive(
+        ctx: TypedActorContext[T],
+        msg: T,
+        target: BehaviorInterceptor.ReceiveTarget[T]
+    ): Behavior[T] = target(ctx, msg)
 
-        override def aroundSignal(
-            ctx: TypedActorContext[T],
-            signal: Signal,
-            target: BehaviorInterceptor.SignalTarget[T]
-        ): Behavior[T] =
-          signal match
-            case PostStop =>
-              agent.stop()
-              target(ctx, signal)
-            case _ => target(ctx, signal)
-    )(behavior)
+    override def aroundSignal(
+        ctx: TypedActorContext[T],
+        signal: Signal,
+        target: BehaviorInterceptor.SignalTarget[T]
+    ): Behavior[T] =
+      signal match
+        case PostStop =>
+          agent.stop()
+          target(ctx, signal)
+        case _ => target(ctx, signal)
+  end AgentCleanupInterceptor
 
   private def promptToWriteResult[O: JsonSchema: ReadWriter](
       agent: Agent,
@@ -127,8 +123,7 @@ Output in the precise format specified above.
         catch
           case e: Exception =>
             if attemptNo >= maxAttempts then
-              replyTo ! LLMError(e)
-              Behaviors.stopped
+              throw e
             else
               val filepath = promptToWriteResult[O](agent, outputInstructions)
               awaitResultWritten[O](
