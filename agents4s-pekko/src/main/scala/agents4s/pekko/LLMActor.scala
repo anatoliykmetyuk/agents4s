@@ -38,7 +38,7 @@ Write the result of your operation to JSON file at the following path: {{JSON_FI
 
 Use the following schema to record your result: {{JSON_SCHEMA}}
 
-Output in the precise format specified above.
+Output in the precise format specified above, including the `$type` keys.
 """
 
   def start[O: JsonSchema: ReadWriter](
