@@ -42,20 +42,20 @@ class CursorAgent(
 
 ## `agents4s.pekko.LLMActor`
 
-Failures after the library exhausts its own retries are delivered on **`replyTo`** as **`LLMActor.LLMError`**.
+After the library exhausts its own JSON parse retries, **`LLMActor` throws** and the **spawned child fails**; **`replyTo` is only used on success** (**`O`**). There is no failure message on **`replyTo`**.
 
 ### `start`
 
 ```scala
 def start[O: JsonSchema: ReadWriter](
-    replyTo: ActorRef[O | LLMError],
+    replyTo: ActorRef[O],
     agentConstructor: () => Agent,
     inputPrompt: String,
     outputInstructions: String
 )
 ```
 
-Returns a **`Behavior`** to **`spawn`**; you interact only through **`replyTo`** (**`O`** on success, **`LLMError`** on failure).
+Returns a **`Behavior`** to **`spawn`**; on success it **`tell`**s **`O`** to **`replyTo`** then stops. On unrecoverable failure the child actor fails (use **`watch`** / **`Terminated`** or supervision to react).
 
 **What it does (high level):** constructs an **`Agent`** via **`agentConstructor`**, runs the **task** from **`inputPrompt`**, then asks the model for **structured JSON** matching **`O`** (schema + instructions come from **`outputInstructions`** and the library). Parses the result and **`tell`**s **`replyTo`**, then stops.
 
@@ -117,10 +117,7 @@ import agents4s.cursor.CursorAgent
 import agents4s.pekko.LLMActor
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
-val adapter = context.messageAdapter[InspectionResult | LLMActor.LLMError] {
-  case r: InspectionResult => LlmFinished(r)
-  case LLMActor.LLMError(e) => LlmFailed(e)
-}
+val adapter = context.messageAdapter[InspectionResult](LlmFinished.apply)
 val taskPrompt = PromptTemplate.load("gatekeeper.md", Map("ITEM_ID" -> itemId))
 val child = context.spawn(
   LLMActor.start[InspectionResult](
@@ -134,4 +131,4 @@ val child = context.spawn(
 context.watch(child)
 ```
 
-Use **`context.watch(child)`** if the parent needs **`ChildTerminated`** / **`Terminated`** for bookkeeping; teardown of the Cursor session is handled inside **`LLMActor`**.
+Use **`context.watch(child)`** so the parent can handle **`Terminated`** when the child stops—both after a successful reply and when the child **fails** after retries (no error is sent on **`replyTo`**). Teardown of the Cursor session is handled inside **`LLMActor`**.

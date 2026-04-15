@@ -9,7 +9,7 @@ import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import agents4s.cursor.CursorAgent
 import agents4s.tmux.Paths
 
-import org.scalatest.Assertions.{assume, fail}
+import org.scalatest.Assertions.assume
 import org.scalatest.ParallelTestExecution
 import org.scalatest.concurrent.TimeLimits
 import org.scalatest.funsuite.AnyFunSuite
@@ -89,7 +89,7 @@ class LLMActorIntegrationSpec
     val kit = ActorTestKit()
     try
       withTimeout:
-        val probe = kit.createTestProbe[SimpleResult | LLMActor.LLMError]()
+        val probe = kit.createTestProbe[SimpleResult]()
         kit.spawn(
           LLMActor.start[SimpleResult](
             probe.ref,
@@ -98,9 +98,8 @@ class LLMActorIntegrationSpec
             "Put only the digits of the numeric answer in field answer (as a string)."
           )
         )
-        probe.receiveMessage(100.seconds) match
-          case SimpleResult(a)      => a should include("4")
-          case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
+        val SimpleResult(a) = probe.receiveMessage(100.seconds)
+        a should include("4")
     finally kit.shutdownTestKit()
   }
 
@@ -112,7 +111,7 @@ class LLMActorIntegrationSpec
     val kit = ActorTestKit()
     try
       withTimeout:
-        val probe = kit.createTestProbe[NumericResult | LLMActor.LLMError]()
+        val probe = kit.createTestProbe[NumericResult]()
         kit.spawn(
           LLMActor.start[NumericResult](
             probe.ref,
@@ -121,9 +120,8 @@ class LLMActorIntegrationSpec
             "Field n must be the integer 56."
           )
         )
-        probe.receiveMessage(100.seconds) match
-          case NumericResult(n)     => n shouldBe 56
-          case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
+        val NumericResult(n) = probe.receiveMessage(100.seconds)
+        n shouldBe 56
     finally kit.shutdownTestKit()
   }
 
@@ -135,7 +133,7 @@ class LLMActorIntegrationSpec
     val kit = ActorTestKit()
     try
       withTimeout:
-        val probe = kit.createTestProbe[BoolResult | LLMActor.LLMError]()
+        val probe = kit.createTestProbe[BoolResult]()
         kit.spawn(
           LLMActor.start[BoolResult](
             probe.ref,
@@ -144,9 +142,8 @@ class LLMActorIntegrationSpec
             "Field ok is true if the correct answer is yes."
           )
         )
-        probe.receiveMessage(100.seconds) match
-          case BoolResult(ok)       => ok shouldBe true
-          case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
+        val BoolResult(ok) = probe.receiveMessage(100.seconds)
+        ok shouldBe true
     finally kit.shutdownTestKit()
   }
 
@@ -158,7 +155,7 @@ class LLMActorIntegrationSpec
     val kit = ActorTestKit()
     try
       withTimeout:
-        val probe = kit.createTestProbe[PersonInfo | LLMActor.LLMError]()
+        val probe = kit.createTestProbe[PersonInfo]()
         kit.spawn(
           LLMActor.start[PersonInfo](
             probe.ref,
@@ -167,11 +164,9 @@ class LLMActorIntegrationSpec
             "Echo name exactly as 'Alice Example' and age as 30 in the JSON fields."
           )
         )
-        probe.receiveMessage(100.seconds) match
-          case PersonInfo(name, age) =>
-            name should include("Alice")
-            age shouldBe 30
-          case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
+        val PersonInfo(name, age) = probe.receiveMessage(100.seconds)
+        name should include("Alice")
+        age shouldBe 30
     finally kit.shutdownTestKit()
   }
 
@@ -185,7 +180,7 @@ class LLMActorIntegrationSpec
     val kit = ActorTestKit()
     try
       withTimeout:
-        val probe = kit.createTestProbe[FileTaskResult | LLMActor.LLMError]()
+        val probe = kit.createTestProbe[FileTaskResult]()
         kit.spawn(
           LLMActor.start[FileTaskResult](
             probe.ref,
@@ -197,13 +192,11 @@ class LLMActorIntegrationSpec
  |and created = true if the file exists with HELLO-$tok inside.""".stripMargin
           )
         )
-        probe.receiveMessage(100.seconds) match
-          case FileTaskResult(path, _) =>
-            val proofStr = proof.toAbsolutePath.normalize.toString
-            path should (include(proofStr) or include(proof.toString))
-            waitForRegularFile(proof) shouldBe true
-            Files.readString(proof, StandardCharsets.UTF_8) should include(s"HELLO-$tok")
-          case LLMActor.LLMError(e) => fail("LLM pipeline failed", e)
+        val FileTaskResult(path, _) = probe.receiveMessage(100.seconds)
+        val proofStr = proof.toAbsolutePath.normalize.toString
+        path should (include(proofStr) or include(proof.toString))
+        waitForRegularFile(proof) shouldBe true
+        Files.readString(proof, StandardCharsets.UTF_8) should include(s"HELLO-$tok")
     finally kit.shutdownTestKit()
   }
 
@@ -215,7 +208,7 @@ class LLMActorIntegrationSpec
     val kit = ActorTestKit()
     try
       withTimeout:
-        val probe = kit.createTestProbe[NumericResult | LLMActor.LLMError]()
+        val probe = kit.createTestProbe[NumericResult]()
         val child = kit.spawn(
           LLMActor.start[NumericResult](
             probe.ref,

@@ -68,7 +68,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
           whenJsonResult(p): path =>
             Files.writeString(path, """{"value":"hello"}""", StandardCharsets.UTF_8)
       )
-      val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
+      val probe = testKit.createTestProbe[TestResult ]()
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
@@ -93,7 +93,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
           whenJsonResult(p): path =>
             Files.writeString(path, """{"value":"delayed"}""", StandardCharsets.UTF_8)
       )
-      val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
+      val probe = testKit.createTestProbe[TestResult ]()
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
@@ -118,7 +118,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
           whenJsonResult(p): path =>
             Files.writeString(path, """{"outer":{"value":"in"},"n":42}""", StandardCharsets.UTF_8)
       )
-      val probe = testKit.createTestProbe[NestedResult | LLMActor.LLMError]()
+      val probe = testKit.createTestProbe[NestedResult ]()
       val child = testKit.spawn(
         LLMActor.start[NestedResult](
           probe.ref,
@@ -146,7 +146,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
             if attempt == 1 then Files.writeString(path, "not json {{{", StandardCharsets.UTF_8)
             else Files.writeString(path, """{"value":"fixed"}""", StandardCharsets.UTF_8)
       )
-      val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
+      val probe = testKit.createTestProbe[TestResult ]()
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
@@ -172,7 +172,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
           whenJsonResult(p): path =>
             Files.writeString(path, "%%%", StandardCharsets.UTF_8)
       )
-      val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
+      val probe = testKit.createTestProbe[TestResult ]()
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
@@ -200,7 +200,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
             if n == 1 then Files.writeString(path, "", StandardCharsets.UTF_8)
             else Files.writeString(path, """{"value":"ok"}""", StandardCharsets.UTF_8)
       )
-      val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
+      val probe = testKit.createTestProbe[TestResult ]()
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
@@ -230,7 +230,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
             p should include("value") // field name from TestResult schema
             Files.writeString(path, """{"value":"v"}""", StandardCharsets.UTF_8)
       )
-      val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
+      val probe = testKit.createTestProbe[TestResult ]()
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
@@ -259,7 +259,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
         busyPhases = List(0, 500),
         onSendPrompt = _ => ()
       )
-      val probe = testKit.createTestProbe[TestResult | LLMActor.LLMError]()
+      val probe = testKit.createTestProbe[TestResult ]()
       val child = testKit.spawn(
         LLMActor.start[TestResult](
           probe.ref,
@@ -293,7 +293,7 @@ class LLMActorSpec extends AnyFunSuite with Matchers with ParallelTestExecution:
               StandardCharsets.UTF_8
             )
       )
-      val probe = testKit.createTestProbe[LargePayload | LLMActor.LLMError]()
+      val probe = testKit.createTestProbe[LargePayload ]()
       val child = testKit.spawn(
         LLMActor.start[LargePayload](
           probe.ref,
