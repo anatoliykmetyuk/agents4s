@@ -29,7 +29,6 @@ import agents4s.prompt.PromptTemplate
 object LLMActor:
   val HeartbeatTimerKey = "heartbeat"
   case object HeartbeatTick
-  case class LLMError(e: Exception)
 
   /** Inlined so result prompting works without classpath resources. */
   private[pekko] val ResultPromptTemplate: String =
@@ -43,7 +42,7 @@ Output in the precise format specified above.
 """
 
   def start[O: JsonSchema: ReadWriter](
-      replyTo: ActorRef[O | LLMError],
+      replyTo: ActorRef[O],
       agentConstructor: () => Agent,
       inputPrompt: String,
       outputInstructions: String
@@ -95,7 +94,7 @@ Output in the precise format specified above.
     resultFilePath
 
   private def awaitDone[O: JsonSchema: ReadWriter](
-      replyTo: ActorRef[O | LLMError],
+      replyTo: ActorRef[O],
       agent: Agent,
       outputInstructions: String
   ): Behavior[HeartbeatTick.type] =
@@ -106,7 +105,7 @@ Output in the precise format specified above.
         awaitResultWritten[O](replyTo, agent, filepath, outputInstructions)
 
   private def awaitResultWritten[O: JsonSchema: ReadWriter](
-      replyTo: ActorRef[O | LLMError],
+      replyTo: ActorRef[O],
       agent: Agent,
       resultFilePath: java.nio.file.Path,
       outputInstructions: String,
